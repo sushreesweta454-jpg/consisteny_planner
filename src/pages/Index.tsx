@@ -1,12 +1,17 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    const user = localStorage.getItem("consistify_current");
-    navigate(user ? "/dashboard" : "/login");
-  }, [navigate]);
+    if (!loading) {
+      navigate(user ? "/dashboard" : "/login");
+    }
+  }, [user, loading, navigate]);
+
   return null;
 };
 
