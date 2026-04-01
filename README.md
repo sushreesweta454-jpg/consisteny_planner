@@ -1,3 +1,3 @@
-# Welcome to consistify
+# Welcome to Consistify
 
 TODO: Document your project here
