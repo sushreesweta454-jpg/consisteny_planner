@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Flame, Clock, Target, TrendingUp, Zap, Trophy } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import StatCard from "@/components/StatCard";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 const quotes = [
