@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const quotes = [
   "The secret of getting ahead is getting started.",
@@ -20,37 +21,39 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || (!isLogin && !name)) {
       toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
       return;
     }
-    // Store user locally for now (will be replaced with DB)
-    const users = JSON.parse(localStorage.getItem("consistify_users") || "[]");
-    if (isLogin) {
-      const user = users.find((u: any) => u.email === email && u.password === password);
-      if (!user) {
-        toast({ title: "Error", description: "Invalid credentials", variant: "destructive" });
-        return;
+
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast({ title: "Welcome back!", description: "Redirecting to dashboard..." });
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name } },
+        });
+        if (error) throw error;
+        toast({ title: "Account created!", description: "Redirecting to dashboard..." });
       }
-      localStorage.setItem("consistify_current", JSON.stringify(user));
-    } else {
-      if (users.find((u: any) => u.email === email)) {
-        toast({ title: "Error", description: "Email already registered", variant: "destructive" });
-        return;
-      }
-      const newUser = { name, email, password, createdAt: new Date().toISOString() };
-      users.push(newUser);
-      localStorage.setItem("consistify_users", JSON.stringify(users));
-      localStorage.setItem("consistify_current", JSON.stringify(newUser));
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    toast({ title: isLogin ? "Welcome back!" : "Account created!", description: "Redirecting to dashboard..." });
-    navigate("/dashboard");
   };
 
   return (
@@ -75,7 +78,6 @@ const Login = () => {
             <p className="text-foreground/80 italic text-sm">"{randomQuote}"</p>
           </div>
         </motion.div>
-        {/* Decorative circles */}
         <div className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/5 blur-2xl" />
         <div className="absolute bottom-32 right-10 w-48 h-48 rounded-full bg-accent/5 blur-3xl" />
       </div>
@@ -140,8 +142,8 @@ const Login = () => {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
-              {isLogin ? "Sign In" : "Create Account"}
+            <Button type="submit" disabled={loading} className="w-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
+              {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
 

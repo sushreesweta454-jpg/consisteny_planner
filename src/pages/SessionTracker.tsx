@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Timer, Play, Square, Plus } from "lucide-react";
+import { Timer, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Session {
-  id: number;
+  id: string;
   task: string;
-  duration: number; // seconds
-  date: string;
+  duration: number;
+  created_at: string;
 }
 
 const SessionTracker = () => {
@@ -17,12 +19,23 @@ const SessionTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
-  const [sessions, setSessions] = useState<Session[]>([
-    { id: 1, task: "Linear Algebra Practice", duration: 5400, date: "Today" },
-    { id: 2, task: "Physics Problems", duration: 3600, date: "Today" },
-    { id: 3, task: "Chemistry Notes", duration: 1800, date: "Yesterday" },
-  ]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchSessions = async () => {
+      const { data } = await supabase
+        .from("study_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (data) setSessions(data);
+    };
+    fetchSessions();
+  }, [user]);
 
   const formatTime = (s: number) => {
     const h = Math.floor(s / 3600);
@@ -41,15 +54,32 @@ const SessionTracker = () => {
     setIntervalId(id);
   };
 
-  const stopTimer = () => {
+  const stopTimer = async () => {
     if (intervalId) clearInterval(intervalId);
     setIsRunning(false);
-    if (seconds > 0) {
-      setSessions([{ id: Date.now(), task, duration: seconds, date: "Today" }, ...sessions]);
-      toast({ title: "Session saved!", description: `${task} — ${formatTime(seconds)}` });
+    if (seconds > 0 && user) {
+      const { data, error } = await supabase
+        .from("study_sessions")
+        .insert({ user_id: user.id, task, duration: seconds })
+        .select()
+        .single();
+      if (!error && data) {
+        setSessions([data, ...sessions]);
+        toast({ title: "Session saved!", description: `${task} — ${formatTime(seconds)}` });
+      }
     }
     setSeconds(0);
     setTask("");
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) return "Today";
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return date.toLocaleDateString();
   };
 
   return (
@@ -61,7 +91,6 @@ const SessionTracker = () => {
         <p className="text-muted-foreground mt-1">Track your study sessions in real-time</p>
       </motion.div>
 
-      {/* Timer */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-8 text-center glow-primary">
         <div className="text-6xl font-bold font-display mb-6 text-gradient-primary">{formatTime(seconds)}</div>
         <div className="flex gap-3 justify-center max-w-md mx-auto">
@@ -78,19 +107,22 @@ const SessionTracker = () => {
         </div>
       </motion.div>
 
-      {/* Session History */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
         <h2 className="text-lg font-semibold font-display mb-4">Recent Sessions</h2>
         <div className="space-y-2">
-          {sessions.map((s) => (
-            <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/20">
-              <div>
-                <p className="text-sm font-medium">{s.task}</p>
-                <p className="text-xs text-muted-foreground">{s.date}</p>
+          {sessions.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-4">No sessions yet. Start your first study session!</p>
+          ) : (
+            sessions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/20">
+                <div>
+                  <p className="text-sm font-medium">{s.task}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(s.created_at)}</p>
+                </div>
+                <span className="text-sm font-mono text-primary">{formatTime(s.duration)}</span>
               </div>
-              <span className="text-sm font-mono text-primary">{formatTime(s.duration)}</span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </motion.div>
     </div>

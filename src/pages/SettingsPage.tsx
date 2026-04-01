@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Settings, User, Bell, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,22 +7,57 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const SettingsPage = () => {
-  const user = JSON.parse(localStorage.getItem("consistify_current") || '{"name":"Student","email":"student@example.com"}');
-  const [name, setName] = useState(user.name || "");
-  const [email] = useState(user.email || "");
+  const { user } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [studyReminders, setStudyReminders] = useState(true);
   const [dailyDigest, setDailyDigest] = useState(true);
   const [streakAlerts, setStreakAlerts] = useState(true);
   const [studyHoursGoal, setStudyHoursGoal] = useState("4");
   const { toast } = useToast();
 
-  const handleSave = () => {
-    const current = JSON.parse(localStorage.getItem("consistify_current") || "{}");
-    current.name = name;
-    localStorage.setItem("consistify_current", JSON.stringify(current));
-    toast({ title: "Settings saved!", description: "Your preferences have been updated" });
+  useEffect(() => {
+    if (!user) return;
+    setEmail(user.email || "");
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+      if (data) {
+        setName(data.full_name || "");
+        setStudyReminders(data.study_reminders ?? true);
+        setDailyDigest(data.daily_digest ?? true);
+        setStreakAlerts(data.streak_alerts ?? true);
+        setStudyHoursGoal(String(data.study_hours_goal ?? 4));
+      }
+    };
+    fetchProfile();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: name,
+        study_reminders: studyReminders,
+        daily_digest: dailyDigest,
+        streak_alerts: streakAlerts,
+        study_hours_goal: parseInt(studyHoursGoal),
+      })
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Settings saved!", description: "Your preferences have been updated" });
+    }
   };
 
   return (
@@ -34,7 +69,6 @@ const SettingsPage = () => {
         <p className="text-muted-foreground mt-1">Manage your preferences</p>
       </motion.div>
 
-      {/* Profile */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6">
         <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2"><User className="h-5 w-5 text-primary" /> Profile</h2>
         <div className="space-y-4">
@@ -49,7 +83,6 @@ const SettingsPage = () => {
         </div>
       </motion.div>
 
-      {/* Notifications */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-6">
         <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> Notifications</h2>
         <div className="space-y-4">
@@ -66,7 +99,6 @@ const SettingsPage = () => {
         </div>
       </motion.div>
 
-      {/* Preferences */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card p-6">
         <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Preferences</h2>
         <div className="space-y-4">
