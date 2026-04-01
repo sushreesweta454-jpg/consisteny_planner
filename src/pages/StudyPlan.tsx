@@ -1,37 +1,134 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Clock, CheckCircle2 } from "lucide-react";
+import { BookOpen, Clock, CheckCircle2, Plus, Trash2, CalendarDays } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const initialTasks = [
-  { id: "1", subject: "Mathematics", topic: "Linear Algebra", time: "9:00 - 10:30" },
-  { id: "2", subject: "Mathematics", topic: "Calculus", time: "11:00 - 12:00" },
-  { id: "3", subject: "Physics", topic: "Mechanics", time: "10:30 - 11:30" },
-  { id: "4", subject: "Physics", topic: "Thermodynamics", time: "13:00 - 14:00" },
-  { id: "5", subject: "Chemistry", topic: "Organic Chemistry", time: "15:30 - 16:30" },
-  { id: "6", subject: "Chemistry", topic: "Periodic Table Review", time: "17:00 - 17:30" },
-  { id: "7", subject: "English", topic: "Essay Writing", time: "18:00 - 19:00" },
-  { id: "8", subject: "Statistics", topic: "Probability", time: "14:00 - 15:00" },
-];
+interface DailyTask {
+  id: string;
+  subject: string;
+  topic: string;
+  time_slot: string | null;
+  completed: boolean;
+  date: string;
+}
 
 const StudyPlan = () => {
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<DailyTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
 
-  const toggle = (id: string) =>
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  // New task form
+  const [subject, setSubject] = useState("");
+  const [topic, setTopic] = useState("");
+  const [timeSlot, setTimeSlot] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
-  const allDone = initialTasks.every((t) => checked[t.id]);
-  const doneCount = initialTasks.filter((t) => checked[t.id]).length;
+  const fetchTasks = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("daily_tasks")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("date", selectedDate)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      toast.error("Failed to load tasks");
+    } else {
+      setTasks(data || []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [user, selectedDate]);
+
+  const addTask = async () => {
+    if (!user || !subject.trim() || !topic.trim()) {
+      toast.error("Subject and topic are required");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("daily_tasks")
+      .insert({
+        user_id: user.id,
+        subject: subject.trim(),
+        topic: topic.trim(),
+        time_slot: timeSlot.trim() || null,
+        date: selectedDate,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error("Failed to add task");
+    } else {
+      setTasks((prev) => [...prev, data]);
+      setSubject("");
+      setTopic("");
+      setTimeSlot("");
+      setShowForm(false);
+      toast.success("Task added");
+    }
+  };
+
+  const toggleTask = async (task: DailyTask) => {
+    const newCompleted = !task.completed;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, completed: newCompleted } : t))
+    );
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({ completed: newCompleted })
+      .eq("id", task.id);
+
+    if (error) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, completed: !newCompleted } : t))
+      );
+      toast.error("Failed to update task");
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    const { error } = await supabase.from("daily_tasks").delete().eq("id", id);
+    if (error) {
+      toast.error("Failed to delete task");
+      fetchTasks();
+    }
+  };
+
+  const doneCount = tasks.filter((t) => t.completed).length;
+  const allDone = tasks.length > 0 && tasks.every((t) => t.completed);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <h1 className="text-3xl font-bold font-display flex items-center gap-3">
-          <BookOpen className="h-8 w-8 text-primary" /> Daily Planner
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {doneCount}/{initialTasks.length} tasks completed
-        </p>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-display flex items-center gap-3">
+            <BookOpen className="h-8 w-8 text-primary" /> Daily Planner
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {tasks.length > 0 ? `${doneCount}/${tasks.length} tasks completed` : "No tasks yet"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-auto bg-secondary border-border"
+          />
+        </div>
       </motion.div>
 
       <AnimatePresence>
@@ -52,47 +149,74 @@ const StudyPlan = () => {
         )}
       </AnimatePresence>
 
+      {/* Add Task */}
+      <div>
+        {!showForm ? (
+          <Button onClick={() => setShowForm(true)} variant="outline" className="w-full border-dashed border-border text-muted-foreground hover:text-foreground">
+            <Plus className="h-4 w-4 mr-2" /> Add Task
+          </Button>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="bg-secondary border-border" />
+              <Input placeholder="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} className="bg-secondary border-border" />
+              <Input placeholder="Time (e.g. 9:00 - 10:30)" value={timeSlot} onChange={(e) => setTimeSlot(e.target.value)} className="bg-secondary border-border" />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={addTask} size="sm">Add</Button>
+              <Button onClick={() => setShowForm(false)} variant="ghost" size="sm">Cancel</Button>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Task List */}
       <div className="space-y-3">
-        {initialTasks.map((task, i) => {
-          const done = !!checked[task.id];
-          return (
+        {loading ? (
+          <p className="text-muted-foreground text-center py-8">Loading...</p>
+        ) : tasks.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No tasks for this date. Add one above!</p>
+        ) : (
+          tasks.map((task, i) => (
             <motion.div
               key={task.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              onClick={() => toggle(task.id)}
+              onClick={() => toggleTask(task)}
               className={`glass-card p-4 flex items-center gap-4 cursor-pointer transition-all ${
-                done
-                  ? "bg-success/5 border-success/20"
-                  : "hover:border-primary/30"
+                task.completed ? "bg-success/5 border-success/20" : "hover:border-primary/30"
               }`}
             >
               <Checkbox
-                checked={done}
-                onCheckedChange={() => toggle(task.id)}
+                checked={task.completed}
+                onCheckedChange={() => toggleTask(task)}
                 className="h-5 w-5"
               />
               <div className="flex-1 min-w-0">
-                <p
-                  className={`font-medium text-sm ${
-                    done ? "line-through text-muted-foreground" : ""
-                  }`}
-                >
+                <p className={`font-medium text-sm ${task.completed ? "line-through text-muted-foreground" : ""}`}>
                   {task.topic}
                 </p>
                 <p className="text-xs text-muted-foreground">{task.subject}</p>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                <Clock className="h-3 w-3" />
-                {task.time}
-              </div>
-              {done && (
-                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+              {task.time_slot && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                  <Clock className="h-3 w-3" />
+                  {task.time_slot}
+                </div>
               )}
+              {task.completed && <CheckCircle2 className="h-4 w-4 text-success shrink-0" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </motion.div>
-          );
-        })}
+          ))
+        )}
       </div>
     </div>
   );
