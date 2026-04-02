@@ -1,26 +1,48 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { BrainCircuit, Plus, X, Sparkles, Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { BrainCircuit, Plus, X, Sparkles, Clock, AlertTriangle, TrendingUp, Target, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GeneratedSlot {
   time: string;
+  endTime: string;
   subject: string;
   duration: string;
   type: string;
+  priority: "high" | "medium" | "low";
+  reason?: string;
 }
+
+interface Insights {
+  weakAreas: string[];
+  strongAreas: string[];
+  bestStudyTime?: string;
+  consistencyScore?: number;
+  tips: string[];
+}
+
+const priorityColors: Record<string, string> = {
+  high: "bg-destructive/10 text-destructive border-destructive/20",
+  medium: "bg-warning/10 text-warning border-warning/20",
+  low: "bg-success/10 text-success border-success/20",
+};
 
 const AISchedule = () => {
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [availableHours, setAvailableHours] = useState("4");
   const [goal, setGoal] = useState("balanced");
   const [schedule, setSchedule] = useState<GeneratedSlot[]>([]);
+  const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const addSubject = () => setSubjects([...subjects, ""]);
   const removeSubject = (i: number) => setSubjects(subjects.filter((_, idx) => idx !== i));
@@ -30,35 +52,38 @@ const AISchedule = () => {
     setSubjects(updated);
   };
 
-  const generateSchedule = () => {
+  const generateSchedule = async () => {
     const validSubjects = subjects.filter((s) => s.trim());
     if (validSubjects.length === 0) {
       toast({ title: "Error", description: "Add at least one subject", variant: "destructive" });
       return;
     }
+    if (!user) {
+      toast({ title: "Error", description: "Please sign in first", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
-    // Simulated AI generation
-    setTimeout(() => {
-      const hours = parseInt(availableHours);
-      const slots: GeneratedSlot[] = [];
-      let currentHour = 9;
-      validSubjects.forEach((sub, i) => {
-        const dur = Math.max(0.5, Math.round((hours / validSubjects.length) * 2) / 2);
-        slots.push({
-          time: `${currentHour}:00`,
-          subject: sub,
-          duration: `${dur}h`,
-          type: i % 2 === 0 ? "Deep Focus" : "Active Recall",
-        });
-        currentHour += dur + 0.5;
-        if (i < validSubjects.length - 1) {
-          slots.push({ time: `${currentHour - 0.5}:00`, subject: "Break", duration: "30min", type: "Rest" });
-        }
+    setSchedule([]);
+    setInsights(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-schedule", {
+        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal },
       });
-      setSchedule(slots);
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setSchedule(data.slots || []);
+      setInsights(data.insights || null);
+      toast({ title: "Schedule Generated! ✨", description: "Your AI-powered study plan is ready" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Generation Failed", description: e.message || "Something went wrong", variant: "destructive" });
+    } finally {
       setLoading(false);
-      toast({ title: "Schedule Generated!", description: "Your AI study plan is ready" });
-    }, 1500);
+    }
   };
 
   return (
@@ -67,9 +92,10 @@ const AISchedule = () => {
         <h1 className="text-3xl font-bold font-display flex items-center gap-3">
           <BrainCircuit className="h-8 w-8 text-primary" /> AI Schedule Generator
         </h1>
-        <p className="text-muted-foreground mt-1">Let AI create your optimal study schedule</p>
+        <p className="text-muted-foreground mt-1">Smart adaptive scheduling powered by AI — learns from your study history</p>
       </motion.div>
 
+      {/* Input Form */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 space-y-5">
         <div className="space-y-3">
           <Label className="text-foreground/80">Subjects</Label>
@@ -116,29 +142,135 @@ const AISchedule = () => {
 
         <Button onClick={generateSchedule} disabled={loading} className="w-full bg-primary text-primary-foreground h-11 glow-primary">
           {loading ? (
-            <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 animate-spin" /> Generating...</span>
+            <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 animate-spin" /> Analyzing your history & generating...</span>
           ) : (
-            <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Generate Schedule</span>
+            <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Generate Smart Schedule</span>
           )}
         </Button>
       </motion.div>
 
-      {schedule.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6">
-          <h2 className="text-lg font-semibold font-display mb-4">Your AI-Generated Schedule</h2>
-          <div className="space-y-2">
-            {schedule.map((slot, i) => (
-              <div key={i} className={`flex items-center gap-4 p-3 rounded-lg ${slot.subject === "Break" ? "bg-warning/5 border border-warning/10" : "bg-secondary/50 border border-border/30"}`}>
-                <Clock className={`h-4 w-4 shrink-0 ${slot.subject === "Break" ? "text-warning" : "text-primary"}`} />
-                <span className="text-sm text-muted-foreground w-16">{slot.time}</span>
-                <span className="text-sm font-medium flex-1">{slot.subject}</span>
-                <span className="text-xs text-muted-foreground">{slot.duration}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${slot.subject === "Break" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>{slot.type}</span>
+      {/* AI Insights */}
+      <AnimatePresence>
+        {insights && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6 space-y-4">
+            <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-warning" /> AI Insights
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {insights.consistencyScore !== undefined && (
+                <div className="bg-secondary/50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold font-display text-primary">{insights.consistencyScore}%</p>
+                  <p className="text-xs text-muted-foreground mt-1">Consistency Score</p>
+                </div>
+              )}
+              {insights.bestStudyTime && (
+                <div className="bg-secondary/50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold font-display text-success">{insights.bestStudyTime}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Best Study Time</p>
+                </div>
+              )}
+              <div className="bg-secondary/50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold font-display text-warning">{schedule.filter(s => s.priority === "high").length}</p>
+                <p className="text-xs text-muted-foreground mt-1">High Priority Blocks</p>
               </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
+            </div>
+
+            {/* Weak/Strong areas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {insights.weakAreas.length > 0 && (
+                <div className="bg-destructive/5 border border-destructive/10 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-destructive flex items-center gap-1 mb-2"><AlertTriangle className="h-3 w-3" /> Needs Improvement</p>
+                  <div className="flex flex-wrap gap-1">
+                    {insights.weakAreas.map((a, i) => (
+                      <span key={i} className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {insights.strongAreas.length > 0 && (
+                <div className="bg-success/5 border border-success/10 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-success flex items-center gap-1 mb-2"><TrendingUp className="h-3 w-3" /> Strong Areas</p>
+                  <div className="flex flex-wrap gap-1">
+                    {insights.strongAreas.map((a, i) => (
+                      <span key={i} className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tips */}
+            {insights.tips.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">💡 Tips</p>
+                {insights.tips.map((tip, i) => (
+                  <p key={i} className="text-sm text-foreground/70 pl-4 border-l-2 border-primary/30">{tip}</p>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Generated Schedule */}
+      <AnimatePresence>
+        {schedule.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
+            <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" /> Your AI-Generated Schedule
+            </h2>
+            <div className="space-y-2">
+              {schedule.map((slot, i) => {
+                const isBreak = slot.subject.toLowerCase().includes("break");
+                const isExpanded = expandedSlot === i;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className={`rounded-lg border cursor-pointer transition-colors ${
+                      isBreak
+                        ? "bg-warning/5 border-warning/10"
+                        : "bg-secondary/50 border-border/30 hover:border-primary/30"
+                    }`}
+                    onClick={() => setExpandedSlot(isExpanded ? null : i)}
+                  >
+                    <div className="flex items-center gap-3 p-3">
+                      <Clock className={`h-4 w-4 shrink-0 ${isBreak ? "text-warning" : "text-primary"}`} />
+                      <span className="text-sm text-muted-foreground w-24 font-mono">{slot.time} – {slot.endTime}</span>
+                      <span className="text-sm font-medium flex-1">{slot.subject}</span>
+                      <span className="text-xs text-muted-foreground">{slot.duration}</span>
+                      {!isBreak && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColors[slot.priority] || priorityColors.medium}`}>
+                          {slot.priority}
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isBreak ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
+                        {slot.type}
+                      </span>
+                      {slot.reason && (isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />)}
+                    </div>
+                    <AnimatePresence>
+                      {isExpanded && slot.reason && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <p className="text-xs text-muted-foreground px-3 pb-3 pl-10">💡 {slot.reason}</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
