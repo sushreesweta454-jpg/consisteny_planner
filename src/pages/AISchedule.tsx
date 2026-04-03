@@ -75,8 +75,10 @@ const AISchedule = () => {
     setInsights(null);
 
     try {
+      const selectedPeriod = timeSlotOptions.find(t => t.value === studyPeriod);
       const { data, error } = await supabase.functions.invoke("generate-schedule", {
-        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal },
+        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal, studyPeriod, startTime: selectedPeriod?.start || "06:00" },
+      });
       });
 
       if (error) throw error;
