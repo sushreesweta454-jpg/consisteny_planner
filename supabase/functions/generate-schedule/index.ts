@@ -26,7 +26,7 @@ serve(async (req) => {
       });
     }
 
-    const { subjects, availableHours, goal } = await req.json();
+    const { subjects, availableHours, goal, studyPeriod, startTime } = await req.json();
 
     // Fetch past study sessions for context
     const weekAgo = new Date();
