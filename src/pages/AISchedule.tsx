@@ -122,7 +122,7 @@ const AISchedule = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label className="text-foreground/80">Available Hours</Label>
             <Select value={availableHours} onValueChange={setAvailableHours}>
@@ -133,6 +133,20 @@ const AISchedule = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-foreground/80">Study Period</Label>
+            <Select value={studyPeriod} onValueChange={setStudyPeriod}>
+              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {timeSlotOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{timeSlotOptions.find(t => t.value === studyPeriod)?.range}</p>
           </div>
           <div className="space-y-2">
             <Label className="text-foreground/80">Study Goal</Label>
