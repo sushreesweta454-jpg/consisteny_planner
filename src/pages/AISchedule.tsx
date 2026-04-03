@@ -33,17 +33,24 @@ const priorityColors: Record<string, string> = {
   low: "bg-success/10 text-success border-success/20",
 };
 
+const timeSlotOptions = [
+  { value: "morning", label: "🌅 Morning", range: "5:00 AM – 12:00 PM", start: "05:00" },
+  { value: "afternoon", label: "☀️ Afternoon", range: "12:00 PM – 5:00 PM", start: "12:00" },
+  { value: "evening", label: "🌙 Evening", range: "5:00 PM – 11:00 PM", start: "17:00" },
+];
+
 const AISchedule = () => {
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [availableHours, setAvailableHours] = useState("4");
   const [goal, setGoal] = useState("balanced");
+  const [studyPeriod, setStudyPeriod] = useState("morning");
   const [schedule, setSchedule] = useState<GeneratedSlot[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-
+  
   const addSubject = () => setSubjects([...subjects, ""]);
   const removeSubject = (i: number) => setSubjects(subjects.filter((_, idx) => idx !== i));
   const updateSubject = (i: number, val: string) => {
@@ -68,8 +75,9 @@ const AISchedule = () => {
     setInsights(null);
 
     try {
+      const selectedPeriod = timeSlotOptions.find(t => t.value === studyPeriod);
       const { data, error } = await supabase.functions.invoke("generate-schedule", {
-        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal },
+        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal, studyPeriod, startTime: selectedPeriod?.start || "06:00" },
       });
 
       if (error) throw error;
@@ -114,7 +122,7 @@ const AISchedule = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label className="text-foreground/80">Available Hours</Label>
             <Select value={availableHours} onValueChange={setAvailableHours}>
@@ -125,6 +133,20 @@ const AISchedule = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-foreground/80">Study Period</Label>
+            <Select value={studyPeriod} onValueChange={setStudyPeriod}>
+              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {timeSlotOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{timeSlotOptions.find(t => t.value === studyPeriod)?.range}</p>
           </div>
           <div className="space-y-2">
             <Label className="text-foreground/80">Study Goal</Label>
