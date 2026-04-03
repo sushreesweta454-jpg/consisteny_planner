@@ -79,7 +79,6 @@ const AISchedule = () => {
       const { data, error } = await supabase.functions.invoke("generate-schedule", {
         body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal, studyPeriod, startTime: selectedPeriod?.start || "06:00" },
       });
-      });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
