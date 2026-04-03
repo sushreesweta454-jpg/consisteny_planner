@@ -70,16 +70,27 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const periodRanges: Record<string, string> = {
+      morning: "5:00 AM – 12:00 PM",
+      afternoon: "12:00 PM – 5:00 PM",
+      evening: "5:00 PM – 11:00 PM",
+    };
+    const periodRange = periodRanges[studyPeriod] || periodRanges.morning;
+    const scheduleStartTime = startTime || "06:00";
+
     const systemPrompt = `You are an intelligent study schedule generator. Create optimal study schedules based on user inputs and their past performance data.
 
 Rules:
-- Generate exact time slots starting from the current hour or next available hour
-- Include 10-15 min breaks between study blocks
+- The user has selected the "${studyPeriod || "morning"}" study period (${periodRange})
+- Start the schedule from exactly ${scheduleStartTime} (24h format)
+- Generate exact time slots within the selected period — DO NOT go outside the period range
+- Include 5-10 min breaks between study blocks
 - Allocate MORE time to weak subjects (low completion rates, less study time)
 - Allocate LESS time to strong subjects (high completion, more study time)
 - Use study techniques: Deep Focus, Active Recall, Spaced Repetition, Practice Problems
 - Be adaptive: if history shows poor performance in a subject, add extra review time
 - Total scheduled time should match available hours closely
+- All times must use HH:MM 24-hour format
 
 You MUST respond using the generate_schedule tool.`;
 
@@ -87,11 +98,10 @@ You MUST respond using the generate_schedule tool.`;
 Subjects: ${subjects.join(", ")}
 Available hours: ${availableHours}
 Study goal: ${goal}
+Study period: ${studyPeriod || "morning"} (${periodRange}), starting from ${scheduleStartTime}
 
 Past 2 weeks performance:
-${historyContext}
-
-Current time: ${new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}`;
+${historyContext}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
