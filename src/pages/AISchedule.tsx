@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BrainCircuit, Plus, X, Sparkles, Clock, AlertTriangle, TrendingUp, Target, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
+import { BrainCircuit, Plus, X, Sparkles, Clock, AlertTriangle, TrendingUp, Target, Lightbulb, ChevronDown, ChevronUp, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,7 @@ const AISchedule = () => {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -91,6 +92,29 @@ const AISchedule = () => {
       toast({ title: "Generation Failed", description: e.message || "Something went wrong", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveToPlanner = async () => {
+    if (!user || schedule.length === 0) return;
+    setSaving(true);
+    const today = new Date().toISOString().split("T")[0];
+    const studySlots = schedule.filter(s => !s.subject.toLowerCase().includes("break"));
+    const rows = studySlots.map(slot => ({
+      user_id: user.id,
+      subject: slot.subject,
+      topic: `${slot.type || "Study"} session`,
+      time_slot: `${slot.time} – ${slot.endTime}`,
+      date: today,
+      completed: false,
+    }));
+
+    const { error } = await supabase.from("daily_tasks").insert(rows);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Saved to Planner! 📋", description: `${rows.length} tasks added to today's Daily Planner` });
     }
   };
 
@@ -239,9 +263,14 @@ const AISchedule = () => {
       <AnimatePresence>
         {schedule.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
-            <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" /> Your AI-Generated Schedule
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" /> Your AI-Generated Schedule
+              </h2>
+              <Button onClick={saveToPlanner} disabled={saving} size="sm" className="bg-primary text-primary-foreground">
+                <Save className="h-4 w-4 mr-1" /> {saving ? "Saving..." : "Save to Planner"}
+              </Button>
+            </div>
             <div className="space-y-2">
               {schedule.map((slot, i) => {
                 const isBreak = slot.subject.toLowerCase().includes("break");
