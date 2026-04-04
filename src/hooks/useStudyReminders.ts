@@ -9,6 +9,7 @@ interface ReminderState {
   date: string;
   goalSent: boolean;
   inactivitySent: boolean;
+  planIncompleteSent: boolean;
 }
 
 function getTodayKey(): string {
