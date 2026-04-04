@@ -24,7 +24,7 @@ function getReminderState(): ReminderState {
       if (parsed.date === getTodayKey()) return parsed;
     }
   } catch {}
-  return { date: getTodayKey(), goalSent: false, inactivitySent: false };
+  return { date: getTodayKey(), goalSent: false, inactivitySent: false, planIncompleteSent: false };
 }
 
 function setReminderState(state: ReminderState) {
