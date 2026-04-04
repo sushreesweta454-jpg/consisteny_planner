@@ -95,6 +95,29 @@ const AISchedule = () => {
     }
   };
 
+  const saveToPlanner = async () => {
+    if (!user || schedule.length === 0) return;
+    setSaving(true);
+    const today = new Date().toISOString().split("T")[0];
+    const studySlots = schedule.filter(s => !s.subject.toLowerCase().includes("break"));
+    const rows = studySlots.map(slot => ({
+      user_id: user.id,
+      subject: slot.subject,
+      topic: `${slot.type || "Study"} session`,
+      time_slot: `${slot.time} – ${slot.endTime}`,
+      date: today,
+      completed: false,
+    }));
+
+    const { error } = await supabase.from("daily_tasks").insert(rows);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Saved to Planner! 📋", description: `${rows.length} tasks added to today's Daily Planner` });
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
