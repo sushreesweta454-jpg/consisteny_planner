@@ -97,6 +97,26 @@ export function useStudyReminders() {
       );
       state.goalSent = true;
       setReminderState(state);
+      return;
+    }
+
+    // Planner check — incomplete daily tasks
+    if (!state.planIncompleteSent) {
+      const { data: tasks } = await supabase
+        .from("daily_tasks")
+        .select("id, completed")
+        .eq("user_id", user.id)
+        .eq("date", today);
+
+      const incomplete = (tasks || []).filter(t => !t.completed);
+      if (tasks && tasks.length > 0 && incomplete.length > 0) {
+        sendNotification(
+          "Study plan incomplete 📝",
+          `You have ${incomplete.length} of ${tasks.length} tasks still pending in today's planner. Keep going!`
+        );
+        state.planIncompleteSent = true;
+        setReminderState(state);
+      }
     }
   }, [user]);
 
