@@ -48,6 +48,7 @@ const AISchedule = () => {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   
