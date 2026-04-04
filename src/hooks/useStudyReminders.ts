@@ -9,6 +9,7 @@ interface ReminderState {
   date: string;
   goalSent: boolean;
   inactivitySent: boolean;
+  planIncompleteSent: boolean;
 }
 
 function getTodayKey(): string {
@@ -23,7 +24,7 @@ function getReminderState(): ReminderState {
       if (parsed.date === getTodayKey()) return parsed;
     }
   } catch {}
-  return { date: getTodayKey(), goalSent: false, inactivitySent: false };
+  return { date: getTodayKey(), goalSent: false, inactivitySent: false, planIncompleteSent: false };
 }
 
 function setReminderState(state: ReminderState) {
@@ -96,6 +97,26 @@ export function useStudyReminders() {
       );
       state.goalSent = true;
       setReminderState(state);
+      return;
+    }
+
+    // Planner check — incomplete daily tasks
+    if (!state.planIncompleteSent) {
+      const { data: tasks } = await supabase
+        .from("daily_tasks")
+        .select("id, completed")
+        .eq("user_id", user.id)
+        .eq("date", today);
+
+      const incomplete = (tasks || []).filter(t => !t.completed);
+      if (tasks && tasks.length > 0 && incomplete.length > 0) {
+        sendNotification(
+          "Study plan incomplete 📝",
+          `You have ${incomplete.length} of ${tasks.length} tasks still pending in today's planner. Keep going!`
+        );
+        state.planIncompleteSent = true;
+        setReminderState(state);
+      }
     }
   }, [user]);
 
