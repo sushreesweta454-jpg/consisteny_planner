@@ -263,9 +263,14 @@ const AISchedule = () => {
       <AnimatePresence>
         {schedule.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
-            <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" /> Your AI-Generated Schedule
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" /> Your AI-Generated Schedule
+              </h2>
+              <Button onClick={saveToPlanner} disabled={saving} size="sm" className="bg-primary text-primary-foreground">
+                <Save className="h-4 w-4 mr-1" /> {saving ? "Saving..." : "Save to Planner"}
+              </Button>
+            </div>
             <div className="space-y-2">
               {schedule.map((slot, i) => {
                 const isBreak = slot.subject.toLowerCase().includes("break");
