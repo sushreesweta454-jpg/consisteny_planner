@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Flame, Clock, Target, TrendingUp, Zap, Trophy } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -13,12 +13,40 @@ const quotes = [
   "It always seems impossible until it's done. — Nelson Mandela",
 ];
 
+/** Count unique study days and compute the current consecutive-day streak. */
+function computeStreakData(sessions: { created_at: string }[]) {
+  if (!sessions.length) return { streak: 0, uniqueDays: 0 };
+
+  // Get unique dates (YYYY-MM-DD) sorted descending
+  const daySet = new Set(sessions.map((s) => s.created_at.slice(0, 10)));
+  const uniqueDays = daySet.size;
+  const sorted = Array.from(daySet).sort((a, b) => (a > b ? -1 : 1));
+
+  // Walk backwards from today counting consecutive days
+  const today = new Date();
+  let streak = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const expected = new Date(today);
+    expected.setDate(expected.getDate() - i);
+    const expectedStr = expected.toISOString().slice(0, 10);
+    if (sorted[i] === expectedStr) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return { streak, uniqueDays };
+}
+
 const Dashboard = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<{ full_name: string | null }>({ full_name: null });
   const [totalHours, setTotalHours] = useState(0);
   const [sessionCount, setSessionCount] = useState(0);
-  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  const [streak, setStreak] = useState(0);
+  const [uniqueDays, setUniqueDays] = useState(0);
+  const randomQuote = useMemo(() => quotes[Math.floor(Math.random() * quotes.length)], []);
 
   useEffect(() => {
     if (!user) return;
@@ -33,17 +61,23 @@ const Dashboard = () => {
 
       const { data: sessions } = await supabase
         .from("study_sessions")
-        .select("duration")
+        .select("duration, created_at")
         .eq("user_id", user.id);
       if (sessions) {
         setTotalHours(Math.round(sessions.reduce((sum, s) => sum + s.duration, 0) / 3600));
         setSessionCount(sessions.length);
+        const { streak: s, uniqueDays: d } = computeStreakData(sessions);
+        setStreak(s);
+        setUniqueDays(d);
       }
     };
     fetchData();
   }, [user]);
 
   const displayName = profile.full_name || user?.user_metadata?.full_name || "Student";
+
+  // 7 unique study days = 1 "session week"
+  const sessionWeeks = Math.floor(uniqueDays / 7);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -54,15 +88,21 @@ const Dashboard = () => {
         </div>
         <div className="glass-card px-4 py-2 flex items-center gap-2">
           <Trophy className="h-4 w-4 text-warning" />
-          <span className="text-sm font-medium">Level {Math.max(1, Math.floor(sessionCount / 5) + 1)} Scholar</span>
+          <span className="text-sm font-medium">Level {Math.max(1, sessionWeeks + 1)} Scholar</span>
         </div>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Study Streak" value="—" subtitle="Start studying to build streaks" icon={Flame} variant="warning" />
-        <StatCard title="Sessions" value={String(sessionCount)} subtitle="Total study sessions" icon={Target} variant="primary" />
+        <StatCard
+          title="Study Streak"
+          value={streak > 0 ? `${streak} day${streak > 1 ? "s" : ""}` : "—"}
+          subtitle={streak > 0 ? "Consecutive days" : "Start studying to build streaks"}
+          icon={Flame}
+          variant="warning"
+        />
+        <StatCard title="Study Days" value={String(uniqueDays)} subtitle={`${sessionWeeks} full week${sessionWeeks !== 1 ? "s" : ""}`} icon={Target} variant="primary" />
         <StatCard title="Total Hours" value={`${totalHours}h`} subtitle="All time" icon={Clock} variant="accent" />
-        <StatCard title="Goals Completed" value="—" subtitle="Set goals in Study Plan" icon={TrendingUp} variant="success" />
+        <StatCard title="Sessions" value={String(sessionCount)} subtitle="Total study sessions" icon={TrendingUp} variant="success" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -72,17 +112,17 @@ const Dashboard = () => {
           </h2>
           <div className="space-y-3">
             {[
-              { days: 7, reward: "Bronze Badge", unlocked: sessionCount >= 7 },
-              { days: 14, reward: "Silver Badge", unlocked: sessionCount >= 14 },
-              { days: 30, reward: "Gold Badge", unlocked: sessionCount >= 30 },
-              { days: 60, reward: "Diamond Badge", unlocked: sessionCount >= 60 },
+              { days: 7, reward: "🥉 Bronze Badge", unlocked: streak >= 7 },
+              { days: 14, reward: "🥈 Silver Badge", unlocked: streak >= 14 },
+              { days: 30, reward: "🥇 Gold Badge", unlocked: streak >= 30 },
+              { days: 60, reward: "💎 Diamond Badge", unlocked: streak >= 60 },
             ].map((r) => (
               <div key={r.days} className={`flex items-center justify-between p-3 rounded-lg ${r.unlocked ? "bg-primary/10 border border-primary/20" : "bg-secondary/50"}`}>
                 <div className="flex items-center gap-3">
                   <Trophy className={`h-4 w-4 ${r.unlocked ? "text-primary" : "text-muted-foreground"}`} />
                   <span className={`text-sm ${r.unlocked ? "text-foreground" : "text-muted-foreground"}`}>{r.reward}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{r.days} sessions</span>
+                <span className="text-xs text-muted-foreground">{r.days} consecutive days</span>
               </div>
             ))}
           </div>
