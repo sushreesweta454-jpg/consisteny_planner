@@ -102,7 +102,7 @@ const SessionTracker = () => {
     const taskLabel = subjectName.trim() ? `${subjectName.trim()} (${modeLabel})` : modeLabel;
     const { data, error } = await supabase
       .from("study_sessions")
-      .insert({ user_id: user.id, task: modeLabel, duration })
+      .insert({ user_id: user.id, task: taskLabel, duration })
       .select()
       .single();
 
