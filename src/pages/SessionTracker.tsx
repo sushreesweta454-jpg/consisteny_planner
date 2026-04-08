@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Timer, Play, Square, Clock, Zap, Coffee, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ const SessionTracker = () => {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [mode, setMode] = useState<StudyMode>("deep-focus");
+  const [subjectName, setSubjectName] = useState("");
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [pomodoroPhase, setPomodoroPhase] = useState<"study" | "break">("study");
   const { toast } = useToast();
@@ -97,22 +99,23 @@ const SessionTracker = () => {
     const endTime = Date.now();
     const duration = Math.floor((endTime - activeSession.startTime) / 1000);
     const modeLabel = activeSession.mode === "pomodoro" ? "Pomodoro" : "Deep Focus";
-
+    const taskLabel = subjectName.trim() ? `${subjectName.trim()} (${modeLabel})` : modeLabel;
     const { data, error } = await supabase
       .from("study_sessions")
-      .insert({ user_id: user.id, task: modeLabel, duration })
+      .insert({ user_id: user.id, task: taskLabel, duration })
       .select()
       .single();
 
     if (!error && data) {
       setTodaySessions((prev) => [data, ...prev]);
-      toast({ title: "Session saved!", description: `${modeLabel} — ${formatTime(duration)}` });
+      toast({ title: "Session saved!", description: `${taskLabel} — ${formatTime(duration)}` });
     }
 
     setActiveSession(null);
     localStorage.removeItem(STORAGE_KEY);
     setPomodoroPhase("study");
-  }, [activeSession, user, toast]);
+    setSubjectName("");
+  }, [activeSession, user, toast, subjectName]);
 
   const resetSession = useCallback(() => {
     setActiveSession(null);
@@ -144,6 +147,17 @@ const SessionTracker = () => {
           <Timer className="h-8 w-8 text-primary" /> Session Tracker
         </h1>
         <p className="text-muted-foreground mt-1">Real-time study tracking with accurate timestamps</p>
+      </motion.div>
+
+      {/* Subject Input */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <Input
+          placeholder="Enter subject name (e.g. Mathematics, Physics...)"
+          value={subjectName}
+          onChange={(e) => setSubjectName(e.target.value)}
+          disabled={isRunning}
+          className="h-12 text-base"
+        />
       </motion.div>
 
       {/* Mode Selector */}
