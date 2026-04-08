@@ -173,7 +173,7 @@ const AISchedule = () => {
             <p className="text-xs text-muted-foreground">{timeSlotOptions.find(t => t.value === studyPeriod)?.range}</p>
           </div>
           <div className="space-y-2">
-            <Label className="text-foreground/80">Study Goal</Label>
+            <Label className="text-foreground/80">Study Style</Label>
             <Select value={goal} onValueChange={setGoal}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
