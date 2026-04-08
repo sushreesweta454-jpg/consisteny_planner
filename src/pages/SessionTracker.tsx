@@ -149,6 +149,17 @@ const SessionTracker = () => {
         <p className="text-muted-foreground mt-1">Real-time study tracking with accurate timestamps</p>
       </motion.div>
 
+      {/* Subject Input */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <Input
+          placeholder="Enter subject name (e.g. Mathematics, Physics...)"
+          value={subjectName}
+          onChange={(e) => setSubjectName(e.target.value)}
+          disabled={isRunning}
+          className="h-12 text-base"
+        />
+      </motion.div>
+
       {/* Mode Selector */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
         <Button
