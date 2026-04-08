@@ -99,7 +99,7 @@ const SessionTracker = () => {
     const endTime = Date.now();
     const duration = Math.floor((endTime - activeSession.startTime) / 1000);
     const modeLabel = activeSession.mode === "pomodoro" ? "Pomodoro" : "Deep Focus";
-
+    const taskLabel = subjectName.trim() ? `${subjectName.trim()} (${modeLabel})` : modeLabel;
     const { data, error } = await supabase
       .from("study_sessions")
       .insert({ user_id: user.id, task: modeLabel, duration })
