@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Settings, User, Bell, Palette } from "lucide-react";
+import { Settings, User, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,7 @@ const SettingsPage = () => {
   const [studyReminders, setStudyReminders] = useState(true);
   const [dailyDigest, setDailyDigest] = useState(true);
   const [streakAlerts, setStreakAlerts] = useState(true);
-  const [studyHoursGoal, setStudyHoursGoal] = useState("4");
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -34,7 +34,7 @@ const SettingsPage = () => {
         setStudyReminders(data.study_reminders ?? true);
         setDailyDigest(data.daily_digest ?? true);
         setStreakAlerts(data.streak_alerts ?? true);
-        setStudyHoursGoal(String(data.study_hours_goal ?? 4));
+        
       }
     };
     fetchProfile();
@@ -49,7 +49,6 @@ const SettingsPage = () => {
         study_reminders: studyReminders,
         daily_digest: dailyDigest,
         streak_alerts: streakAlerts,
-        study_hours_goal: parseInt(studyHoursGoal),
       })
       .eq("user_id", user.id);
 
@@ -99,22 +98,6 @@ const SettingsPage = () => {
         </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card p-6">
-        <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Preferences</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">Daily Study Hours Goal</span>
-            <Select value={studyHoursGoal} onValueChange={setStudyHoursGoal}>
-              <SelectTrigger className="bg-secondary border-border w-28"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5, 6, 7, 8].map((h) => (
-                  <SelectItem key={h} value={String(h)}>{h} hours</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </motion.div>
 
       <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground h-11 glow-primary">Save Changes</Button>
     </div>
