@@ -114,7 +114,8 @@ const SessionTracker = () => {
     setActiveSession(null);
     localStorage.removeItem(STORAGE_KEY);
     setPomodoroPhase("study");
-  }, [activeSession, user, toast]);
+    setSubjectName("");
+  }, [activeSession, user, toast, subjectName]);
 
   const resetSession = useCallback(() => {
     setActiveSession(null);
