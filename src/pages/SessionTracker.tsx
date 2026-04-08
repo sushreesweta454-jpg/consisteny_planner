@@ -26,6 +26,7 @@ const SessionTracker = () => {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [mode, setMode] = useState<StudyMode>("deep-focus");
+  const [subjectName, setSubjectName] = useState("");
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [pomodoroPhase, setPomodoroPhase] = useState<"study" | "break">("study");
   const { toast } = useToast();
