@@ -17,7 +17,7 @@ const SettingsPage = () => {
   const [studyReminders, setStudyReminders] = useState(true);
   const [dailyDigest, setDailyDigest] = useState(true);
   const [streakAlerts, setStreakAlerts] = useState(true);
-  const [studyHoursGoal, setStudyHoursGoal] = useState("4");
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -34,7 +34,7 @@ const SettingsPage = () => {
         setStudyReminders(data.study_reminders ?? true);
         setDailyDigest(data.daily_digest ?? true);
         setStreakAlerts(data.streak_alerts ?? true);
-        setStudyHoursGoal(String(data.study_hours_goal ?? 4));
+        
       }
     };
     fetchProfile();
@@ -49,7 +49,6 @@ const SettingsPage = () => {
         study_reminders: studyReminders,
         daily_digest: dailyDigest,
         streak_alerts: streakAlerts,
-        study_hours_goal: parseInt(studyHoursGoal),
       })
       .eq("user_id", user.id);
 
