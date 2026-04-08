@@ -108,7 +108,7 @@ const SessionTracker = () => {
 
     if (!error && data) {
       setTodaySessions((prev) => [data, ...prev]);
-      toast({ title: "Session saved!", description: `${modeLabel} — ${formatTime(duration)}` });
+      toast({ title: "Session saved!", description: `${taskLabel} — ${formatTime(duration)}` });
     }
 
     setActiveSession(null);
