@@ -57,16 +57,6 @@ const SessionTracker = () => {
     return () => clearInterval(id);
   }, [activeSession]);
 
-  // Pomodoro auto-cycle
-  useEffect(() => {
-    if (!activeSession || mode !== "pomodoro") return;
-    const studyDuration = 25 * 60;
-    const breakDuration = 5 * 60;
-    const cycleLength = studyDuration + breakDuration;
-    const posInCycle = elapsed % cycleLength;
-    setPomodoroPhase(posInCycle < studyDuration ? "study" : "break");
-  }, [elapsed, activeSession, mode]);
-
   // Fetch today's sessions
   useEffect(() => {
     if (!user) return;
@@ -129,6 +119,14 @@ const SessionTracker = () => {
     localStorage.removeItem(STORAGE_KEY);
     setPomodoroPhase("study");
   }, []);
+
+  // Pomodoro auto-stop at 25 minutes
+  useEffect(() => {
+    if (!activeSession || mode !== "pomodoro") return;
+    if (elapsed >= 25 * 60) {
+      finishSession();
+    }
+  }, [elapsed, activeSession, mode, finishSession]);
 
   const todayTotal = useMemo(() => todaySessions.reduce((sum, s) => sum + s.duration, 0), [todaySessions]);
 
