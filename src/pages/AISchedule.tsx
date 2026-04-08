@@ -42,7 +42,7 @@ const timeSlotOptions = [
 const AISchedule = () => {
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [availableHours, setAvailableHours] = useState("4");
-  const [goal, setGoal] = useState("balanced");
+  const [goal, setGoal] = useState("deep-focus");
   const [studyPeriod, setStudyPeriod] = useState("morning");
   const [schedule, setSchedule] = useState<GeneratedSlot[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
@@ -177,10 +177,9 @@ const AISchedule = () => {
             <Select value={goal} onValueChange={setGoal}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="balanced">Balanced</SelectItem>
-                <SelectItem value="exam-prep">Exam Preparation</SelectItem>
-                <SelectItem value="deep-learning">Deep Learning</SelectItem>
-                <SelectItem value="revision">Quick Revision</SelectItem>
+                <SelectItem value="deep-focus">Deep Focus</SelectItem>
+                <SelectItem value="pomodoro">Pomodoro</SelectItem>
+                <SelectItem value="mixed">Mixed</SelectItem>
               </SelectContent>
             </Select>
           </div>
