@@ -99,22 +99,6 @@ const SettingsPage = () => {
         </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card p-6">
-        <h2 className="text-lg font-semibold font-display mb-4 flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Preferences</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">Daily Study Hours Goal</span>
-            <Select value={studyHoursGoal} onValueChange={setStudyHoursGoal}>
-              <SelectTrigger className="bg-secondary border-border w-28"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5, 6, 7, 8].map((h) => (
-                  <SelectItem key={h} value={String(h)}>{h} hours</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </motion.div>
 
       <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground h-11 glow-primary">Save Changes</Button>
     </div>

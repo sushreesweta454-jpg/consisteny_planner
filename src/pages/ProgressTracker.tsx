@@ -4,7 +4,7 @@ import { TrendingUp, Calendar, Trophy, ChevronLeft, ChevronRight } from "lucide-
 import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
-  LineChart, Line, PieChart, Pie, Cell, Legend,
+  LineChart, Line,
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,7 @@ interface Session {
   created_at: string;
 }
 
-const COLORS = ["hsl(172,66%,50%)", "hsl(262,60%,58%)", "hsl(38,92%,50%)", "hsl(142,71%,45%)", "hsl(0,72%,51%)", "hsl(200,80%,55%)"];
+
 
 const ProgressTracker = () => {
   const { user } = useAuth();
@@ -89,22 +89,6 @@ const ProgressTracker = () => {
   const weekAvg = Math.round((weekTotal / 7) * 10) / 10;
   const bestDay = useMemo(() => weeklyData.reduce((best, d) => (d.hours > best.hours ? d : best), weeklyData[0]), [weeklyData]);
 
-  // Subject distribution
-  const subjectData = useMemo(() => {
-    const m: Record<string, number> = {};
-    sessions.forEach((s) => {
-      m[s.task] = (m[s.task] || 0) + s.duration;
-    });
-    const total = Object.values(m).reduce((a, b) => a + b, 0) || 1;
-    return Object.entries(m)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([name, secs]) => ({
-        name,
-        value: Math.round((secs / total) * 100),
-        hours: Math.round((secs / 3600) * 10) / 10,
-      }));
-  }, [sessions]);
 
   // Sessions for selected date
   const selectedSessions = useMemo(() => {
@@ -273,37 +257,6 @@ const ProgressTracker = () => {
         </motion.div>
       )}
 
-      {/* Subject Distribution */}
-      {subjectData.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card p-6">
-          <h2 className="text-lg font-semibold font-display mb-4">🥧 Subject Distribution</h2>
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <ResponsiveContainer width={200} height={200}>
-              <PieChart>
-                <Pie data={subjectData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                  {subjectData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: "hsl(222 44% 9%)", border: "1px solid hsl(222 30% 18%)", borderRadius: "8px", color: "hsl(210 40% 96%)" }}
-                  formatter={(value: number) => [`${value}%`]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2 w-full">
-              {subjectData.map((s, i) => (
-                <div key={s.name} className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                  <span className="text-sm flex-1">{s.name}</span>
-                  <span className="text-xs text-muted-foreground">{s.hours}h</span>
-                  <span className="text-xs font-semibold text-foreground w-10 text-right">{s.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 };
