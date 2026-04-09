@@ -51,7 +51,7 @@ export function AppSidebar() {
         <div className={`px-4 mb-6 flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
           <BookOpenCheck className="h-7 w-7 text-primary shrink-0" />
           {!collapsed && (
-            <span className="text-xl font-bold font-display text-gradient-primary">Consistency</span>
+            <span className="text-xl font-bold font-display text-gradient-primary">CONSISTIFY</span>
           )}
         </div>
         <SidebarGroup>

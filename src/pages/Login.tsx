@@ -71,8 +71,8 @@ const Login = () => {
               <BookOpen className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold font-display mb-4 text-gradient-primary">Consistency</h1>
-          <p className="text-muted-foreground text-lg mb-8">AI-Powered Study Consistency Planner</p>
+          <h1 className="text-5xl font-bold font-display mb-4 text-gradient-primary">CONSISTIFY</h1>
+          <p className="text-muted-foreground text-lg mb-8">AI Consistency Study Planner</p>
           <div className="glass-card p-6 glow-primary">
             <p className="text-foreground/80 italic text-sm">"{randomQuote}"</p>
           </div>
@@ -91,7 +91,7 @@ const Login = () => {
         >
           <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
             <BookOpen className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold font-display text-gradient-primary">Consistency</span>
+            <span className="text-2xl font-bold font-display text-gradient-primary">CONSISTIFY</span>
           </div>
 
           <h2 className="text-3xl font-bold font-display mb-2">{isLogin ? "Welcome back" : "Create account"}</h2>
