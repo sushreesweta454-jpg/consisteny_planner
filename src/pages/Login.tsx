@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const quotes = [
   "The secret of getting ahead is getting started.",
@@ -24,6 +24,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signUp } = useAuth();
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,15 +37,11 @@ const Login = () => {
     setLoading(true);
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await signIn(email, password);
         if (error) throw error;
         toast({ title: "Welcome back!", description: "Redirecting to dashboard..." });
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: name } },
-        });
+        const { error } = await signUp(email, password, name);
         if (error) throw error;
         toast({ title: "Account created!", description: "Redirecting to dashboard..." });
       }

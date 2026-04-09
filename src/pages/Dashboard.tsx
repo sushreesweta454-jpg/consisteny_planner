@@ -4,7 +4,7 @@ import { Flame, Clock, Target, TrendingUp, Zap, Trophy } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import StatCard from "@/components/StatCard";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 const quotes = [
   "The secret of getting ahead is getting started. — Mark Twain",
@@ -52,24 +52,19 @@ const Dashboard = () => {
     if (!user) return;
 
     const fetchData = async () => {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", user.id)
-        .single();
-      if (profileData) setProfile(profileData);
+      sqliteClient.from("profiles").select("full_name").eq("user_id", user.id).single().then(({ data: profileData }) => {
+        if (profileData) setProfile(profileData);
+      });
 
-      const { data: sessions } = await supabase
-        .from("study_sessions")
-        .select("duration, created_at")
-        .eq("user_id", user.id);
-      if (sessions) {
-        setTotalHours(Math.round(sessions.reduce((sum, s) => sum + s.duration, 0) / 3600));
-        setSessionCount(sessions.length);
-        const { streak: s, uniqueDays: d } = computeStreakData(sessions);
-        setStreak(s);
-        setUniqueDays(d);
-      }
+      sqliteClient.from("study_sessions").select("duration, created_at").eq("user_id", user.id).then(({ data: sessions }) => {
+        if (sessions) {
+          setTotalHours(Math.round(sessions.reduce((sum, s) => sum + s.duration, 0) / 3600));
+          setSessionCount(sessions.length);
+          const { streak: s, uniqueDays: d } = computeStreakData(sessions);
+          setStreak(s);
+          setUniqueDays(d);
+        }
+      });
     };
     fetchData();
   }, [user]);

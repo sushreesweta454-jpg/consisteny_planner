@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 const SettingsPage = () => {
   const { user } = useAuth();
@@ -23,40 +23,34 @@ const SettingsPage = () => {
   useEffect(() => {
     if (!user) return;
     setEmail(user.email || "");
-    const fetchProfile = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-      if (data) {
-        setName(data.full_name || "");
-        setStudyReminders(data.study_reminders ?? true);
-        setDailyDigest(data.daily_digest ?? true);
-        setStreakAlerts(data.streak_alerts ?? true);
-        
-      }
+    const fetchProfile = () => {
+      sqliteClient.from("profiles").select("*").eq("user_id", user.id).single().then(({ data }) => {
+        if (data) {
+          setName(data.full_name || "");
+          setStudyReminders(data.study_reminders ?? true);
+          setDailyDigest(data.daily_digest ?? true);
+          setStreakAlerts(data.streak_alerts ?? true);
+        }
+      });
     };
     fetchProfile();
   }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: name,
-        study_reminders: studyReminders,
-        daily_digest: dailyDigest,
-        streak_alerts: streakAlerts,
-      })
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Settings saved!", description: "Your preferences have been updated" });
-    }
+    sqliteClient.from("profiles").update({
+      full_name: name,
+      study_reminders: studyReminders,
+      daily_digest: dailyDigest,
+      streak_alerts: streakAlerts,
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", user.id).then(({ error }) => {
+      if (error) {
+        toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+      } else {
+        toast({ title: "Settings saved!", description: "Your preferences have been updated" });
+      }
+    });
   };
 
   return (

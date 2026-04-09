@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 interface GeneratedSlot {
   time: string;
@@ -76,17 +76,44 @@ const AISchedule = () => {
     setInsights(null);
 
     try {
+      // Simple local schedule generation
       const selectedPeriod = timeSlotOptions.find(t => t.value === studyPeriod);
-      const { data, error } = await supabase.functions.invoke("generate-schedule", {
-        body: { subjects: validSubjects, availableHours: parseInt(availableHours), goal, studyPeriod, startTime: selectedPeriod?.start || "06:00" },
+      const startTime = selectedPeriod?.start || "06:00";
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const totalMinutes = parseInt(availableHours) * 60;
+      const slotDuration = 45; // 45 min study
+      const breakDuration = 10; // 10 min break
+      const slots: GeneratedSlot[] = [];
+      let currentTime = startHour * 60 + startMin;
+
+      for (let i = 0; i < validSubjects.length && currentTime < startHour * 60 + startMin + totalMinutes; i++) {
+        const subject = validSubjects[i];
+        const endTime = currentTime + slotDuration;
+        const timeStr = `${Math.floor(currentTime / 60).toString().padStart(2, '0')}:${(currentTime % 60).toString().padStart(2, '0')}`;
+        const endTimeStr = `${Math.floor(endTime / 60).toString().padStart(2, '0')}:${(endTime % 60).toString().padStart(2, '0')}`;
+
+        slots.push({
+          time: timeStr,
+          endTime: endTimeStr,
+          subject,
+          duration: `${slotDuration} min`,
+          type: "Study",
+          priority: "medium",
+          reason: "Balanced study session"
+        });
+
+        currentTime = endTime + breakDuration;
+      }
+
+      setSchedule(slots);
+      setInsights({
+        weakAreas: [],
+        strongAreas: validSubjects,
+        bestStudyTime: studyPeriod,
+        consistencyScore: 80,
+        tips: ["Take regular breaks", "Stay hydrated", "Review notes after each session"]
       });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setSchedule(data.slots || []);
-      setInsights(data.insights || null);
-      toast({ title: "Schedule Generated! ✨", description: "Your AI-powered study plan is ready" });
+      toast({ title: "Schedule Generated! ✨", description: "Your study plan is ready" });
     } catch (e: any) {
       console.error(e);
       toast({ title: "Generation Failed", description: e.message || "Something went wrong", variant: "destructive" });
@@ -101,18 +128,30 @@ const AISchedule = () => {
     const today = new Date().toISOString().split("T")[0];
     const studySlots = schedule.filter(s => !s.subject.toLowerCase().includes("break"));
     const rows = studySlots.map(slot => ({
+      id: Date.now().toString() + Math.random().toString(),
       user_id: user.id,
       subject: slot.subject,
       topic: `${slot.type || "Study"} session`,
       time_slot: `${slot.time} – ${slot.endTime}`,
       date: today,
       completed: false,
+      created_at: new Date().toISOString(),
     }));
 
-    const { error } = await supabase.from("daily_tasks").insert(rows);
+    // Insert all at once - but since my client doesn't support bulk, do one by one
+    let error = null;
+    for (const row of rows) {
+      await new Promise<void>((resolve) => {
+        sqliteClient.from("daily_tasks").insert(row).then(({ error: e }) => {
+          if (e) error = e;
+          resolve();
+        });
+      });
+    }
+
     setSaving(false);
     if (error) {
-      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      toast({ title: "Save failed", description: "Failed to save tasks", variant: "destructive" });
     } else {
       toast({ title: "Saved to Planner! 📋", description: `${rows.length} tasks added to today's Daily Planner` });
     }

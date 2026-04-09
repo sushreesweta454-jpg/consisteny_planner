@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 interface Reminder {
   id: string;
@@ -24,13 +24,10 @@ const Reminders = () => {
 
   useEffect(() => {
     if (!user) return;
-    const fetchReminders = async () => {
-      const { data } = await supabase
-        .from("reminders")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
-      if (data) setReminders(data);
+    const fetchReminders = () => {
+      sqliteClient.from("reminders").select("*").eq("user_id", user.id).then(({ data }) => {
+        if (data) setReminders(data.sort((a, b) => a.created_at.localeCompare(b.created_at)));
+      });
     };
     fetchReminders();
   }, [user]);
@@ -40,29 +37,36 @@ const Reminders = () => {
       toast({ title: "Error", description: "Fill in title and time", variant: "destructive" });
       return;
     }
-    const { data, error } = await supabase
-      .from("reminders")
-      .insert({ user_id: user.id, title: newTitle, time: newTime, enabled: true })
-      .select()
-      .single();
-    if (!error && data) {
-      setReminders([...reminders, data]);
-      setNewTitle("");
-      setNewTime("");
-      toast({ title: "Reminder added!" });
-    }
+    const newReminder = {
+      id: Date.now().toString(),
+      user_id: user.id,
+      title: newTitle,
+      time: newTime,
+      enabled: true,
+      created_at: new Date().toISOString()
+    };
+    sqliteClient.from("reminders").insert(newReminder).then(({ error }) => {
+      if (!error) {
+        setReminders([...reminders, newReminder]);
+        setNewTitle("");
+        setNewTime("");
+        toast({ title: "Reminder added!" });
+      }
+    });
   };
 
   const toggleReminder = async (id: string) => {
     const reminder = reminders.find((r) => r.id === id);
     if (!reminder) return;
-    await supabase.from("reminders").update({ enabled: !reminder.enabled }).eq("id", id);
-    setReminders(reminders.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+    sqliteClient.from("reminders").update({ enabled: !reminder.enabled }).eq("id", id).then(() => {
+      setReminders(reminders.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+    });
   };
 
   const deleteReminder = async (id: string) => {
-    await supabase.from("reminders").delete().eq("id", id);
-    setReminders(reminders.filter((r) => r.id !== id));
+    sqliteClient.from("reminders").delete().eq("id", id).then(() => {
+      setReminders(reminders.filter((r) => r.id !== id));
+    });
   };
 
   return (

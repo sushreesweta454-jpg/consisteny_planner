@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Consistify Planner logo">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#22C55E" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="30" fill="#111827" />
+  <path d="M40 30 C30 30 25 40 25 55 C25 75 40 85 60 85 C80 85 95 75 95 55 C95 40 90 30 80 30" fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round" />
+  <circle cx="60" cy="55" r="10" fill="#F8FAFC" />
+</svg>

@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 import { toast } from "sonner";
 
 interface DailyTask {
@@ -31,19 +31,15 @@ const StudyPlan = () => {
 
   const fetchTasks = async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from("daily_tasks")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date", selectedDate)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      toast.error("Failed to load tasks");
-    } else {
-      setTasks(data || []);
-    }
-    setLoading(false);
+    sqliteClient.from("daily_tasks").select("*").eq("user_id", user.id).then(({ data, error }) => {
+      if (error) {
+        toast.error("Failed to load tasks");
+      } else {
+        const filteredTasks = (data || []).filter(task => task.date === selectedDate);
+        setTasks(filteredTasks);
+      }
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
@@ -55,28 +51,27 @@ const StudyPlan = () => {
       toast.error("Subject and topic are required");
       return;
     }
-    const { data, error } = await supabase
-      .from("daily_tasks")
-      .insert({
-        user_id: user.id,
-        subject: subject.trim(),
-        topic: topic.trim(),
-        time_slot: timeSlot.trim() || null,
-        date: selectedDate,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Failed to add task");
-    } else {
-      setTasks((prev) => [...prev, data]);
-      setSubject("");
-      setTopic("");
-      setTimeSlot("");
-      setShowForm(false);
-      toast.success("Task added");
-    }
+    sqliteClient.from("daily_tasks").insert({
+      id: Date.now().toString(),
+      user_id: user.id,
+      subject: subject.trim(),
+      topic: topic.trim(),
+      time_slot: timeSlot.trim() || null,
+      date: selectedDate,
+      completed: false,
+      created_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) {
+        toast.error("Failed to add task");
+      } else {
+        fetchTasks(); // Refresh tasks
+        setSubject("");
+        setTopic("");
+        setTimeSlot("");
+        setShowForm(false);
+        toast.success("Task added");
+      }
+    });
   };
 
   const toggleTask = async (task: DailyTask) => {
@@ -84,26 +79,24 @@ const StudyPlan = () => {
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, completed: newCompleted } : t))
     );
-    const { error } = await supabase
-      .from("daily_tasks")
-      .update({ completed: newCompleted })
-      .eq("id", task.id);
-
-    if (error) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, completed: !newCompleted } : t))
-      );
-      toast.error("Failed to update task");
-    }
+    sqliteClient.from("daily_tasks").update({ completed: newCompleted }).eq("id", task.id).then(({ error }) => {
+      if (error) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === task.id ? { ...t, completed: !newCompleted } : t))
+        );
+        toast.error("Failed to update task");
+      }
+    });
   };
 
   const deleteTask = async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    const { error } = await supabase.from("daily_tasks").delete().eq("id", id);
-    if (error) {
-      toast.error("Failed to delete task");
-      fetchTasks();
-    }
+    sqliteClient.from("daily_tasks").delete().eq("id", id).then(({ error }) => {
+      if (error) {
+        toast.error("Failed to delete task");
+        fetchTasks();
+      }
+    });
   };
 
   const doneCount = tasks.filter((t) => t.completed).length;

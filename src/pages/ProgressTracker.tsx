@@ -7,7 +7,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 interface Session {
   task: string;
@@ -26,14 +26,10 @@ const ProgressTracker = () => {
 
   useEffect(() => {
     if (!user) return;
-    const fetchAll = async () => {
-      const { data } = await supabase
-        .from("study_sessions")
-        .select("task, duration, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      if (data) setSessions(data);
+    const fetchAll = () => {
+      sqliteClient.from("study_sessions").select("task, duration, created_at").eq("user_id", user.id).then(({ data }) => {
+        if (data) setSessions(data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      });
     };
     fetchAll();
   }, [user]);
@@ -75,7 +71,8 @@ const ProgressTracker = () => {
   const weeklyData = useMemo(() => {
     const now = new Date();
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+    const offset = (now.getDay() + 6) % 7; // convert Sunday=0 to previous Monday
+    startOfWeek.setDate(now.getDate() - offset);
     const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     return labels.map((label, i) => {
       const d = new Date(startOfWeek);
@@ -85,6 +82,7 @@ const ProgressTracker = () => {
     });
   }, [dailyMap]);
 
+  const hasWeeklyActivity = weeklyData.some((d) => d.hours > 0);
   const weekTotal = useMemo(() => weeklyData.reduce((sum, d) => sum + d.hours, 0), [weeklyData]);
   const weekAvg = Math.round((weekTotal / 7) * 10) / 10;
   const bestDay = useMemo(() => weeklyData.reduce((best, d) => (d.hours > best.hours ? d : best), weeklyData[0]), [weeklyData]);
@@ -239,9 +237,9 @@ const ProgressTracker = () => {
       </motion.div>
 
       {/* Trend Line */}
-      {weeklyData.some((d) => d.hours > 0) && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-6">
-          <h2 className="text-lg font-semibold font-display mb-4">📈 Weekly Trend</h2>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-6">
+        <h2 className="text-lg font-semibold font-display mb-4">📈 Weekly Trend</h2>
+        {hasWeeklyActivity ? (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={weeklyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 18%)" />
@@ -254,8 +252,10 @@ const ProgressTracker = () => {
               <Line type="monotone" dataKey="hours" stroke="hsl(262 60% 58%)" strokeWidth={2} dot={{ fill: "hsl(262 60% 58%)", r: 4 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
-        </motion.div>
-      )}
+        ) : (
+          <p className="text-muted-foreground text-sm text-center py-8">No weekly trend data yet.</p>
+        )}
+      </motion.div>
 
     </div>
   );

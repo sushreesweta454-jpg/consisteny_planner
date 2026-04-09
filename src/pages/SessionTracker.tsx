@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { sqliteClient } from "@/integrations/sqlite/client";
 
 type StudyMode = "deep-focus" | "pomodoro";
 
@@ -63,15 +63,13 @@ const SessionTracker = () => {
   useEffect(() => {
     if (!user) return;
     const today = new Date().toISOString().slice(0, 10);
-    const fetchToday = async () => {
-      const { data } = await supabase
-        .from("study_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("created_at", `${today}T00:00:00`)
-        .lte("created_at", `${today}T23:59:59`)
-        .order("created_at", { ascending: false });
-      if (data) setTodaySessions(data);
+    const fetchToday = () => {
+      sqliteClient.from("study_sessions").select("*").eq("user_id", user.id).then(({ data }) => {
+        if (data) {
+          const todayData = data.filter(session => session.created_at.startsWith(today));
+          setTodaySessions(todayData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        }
+      });
     };
     fetchToday();
   }, [user]);
@@ -100,16 +98,25 @@ const SessionTracker = () => {
     const duration = Math.floor((endTime - activeSession.startTime) / 1000);
     const modeLabel = activeSession.mode === "pomodoro" ? "Pomodoro" : "Deep Focus";
     const taskLabel = subjectName.trim() ? `${subjectName.trim()} (${modeLabel})` : modeLabel;
-    const { data, error } = await supabase
-      .from("study_sessions")
-      .insert({ user_id: user.id, task: taskLabel, duration })
-      .select()
-      .single();
-
-    if (!error && data) {
-      setTodaySessions((prev) => [data, ...prev]);
-      toast({ title: "Session saved!", description: `${taskLabel} — ${formatTime(duration)}` });
-    }
+    sqliteClient.from("study_sessions").insert({
+      id: Date.now().toString(),
+      user_id: user.id,
+      task: taskLabel,
+      duration,
+      created_at: new Date().toISOString()
+    }).then(({ error }) => {
+      if (!error) {
+        // Refresh today's sessions
+        const today = new Date().toISOString().slice(0, 10);
+        sqliteClient.from("study_sessions").select("*").eq("user_id", user.id).then(({ data }) => {
+          if (data) {
+            const todayData = data.filter(session => session.created_at.startsWith(today));
+            setTodaySessions(todayData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+          }
+        });
+        toast({ title: "Session saved!", description: `${taskLabel} — ${formatTime(duration)}` });
+      }
+    });
 
     setActiveSession(null);
     localStorage.removeItem(STORAGE_KEY);
