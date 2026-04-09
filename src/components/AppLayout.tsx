@@ -9,6 +9,8 @@ const AppLayout = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  useStudyReminders();
+
   useEffect(() => {
     if (!loading && !user) {
       navigate("/login");
@@ -22,8 +24,6 @@ const AppLayout = () => {
   if (!user) {
     return null;
   }
-
-  useStudyReminders();
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">

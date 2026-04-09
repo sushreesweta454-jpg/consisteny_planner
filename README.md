@@ -1,3 +1,3 @@
-# Welcome to Consistify
+# Welcome to Consistency
 
-TODO: Document your project here
+

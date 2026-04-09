@@ -81,13 +81,32 @@ const AISchedule = () => {
       const startTime = selectedPeriod?.start || "06:00";
       const [startHour, startMin] = startTime.split(':').map(Number);
       const totalMinutes = parseInt(availableHours) * 60;
-      const slotDuration = 45; // 45 min study
-      const breakDuration = 10; // 10 min break
       const slots: GeneratedSlot[] = [];
       let currentTime = startHour * 60 + startMin;
 
+      // Define study durations based on goal
+      let studyDurations: number[] = [];
+      let breakDuration = 10; // default break
+
+      if (goal === "deep-focus") {
+        // Deep Focus: 2 hour sessions
+        studyDurations = [120]; // 2 hours
+        breakDuration = 15; // longer break for deep focus
+      } else if (goal === "pomodoro") {
+        // Pomodoro: 25 minute sessions
+        studyDurations = [25]; // 25 minutes
+        breakDuration = 5; // short break
+      } else if (goal === "mixed") {
+        // Mixed: Alternate between deep focus (2h) and pomodoro (25min)
+        studyDurations = [120, 25]; // alternate between the two
+        breakDuration = 10;
+      }
+
+      let durationIndex = 0;
+
       for (let i = 0; i < validSubjects.length && currentTime < startHour * 60 + startMin + totalMinutes; i++) {
         const subject = validSubjects[i];
+        const slotDuration = studyDurations[durationIndex % studyDurations.length];
         const endTime = currentTime + slotDuration;
         const timeStr = `${Math.floor(currentTime / 60).toString().padStart(2, '0')}:${(currentTime % 60).toString().padStart(2, '0')}`;
         const endTimeStr = `${Math.floor(endTime / 60).toString().padStart(2, '0')}:${(endTime % 60).toString().padStart(2, '0')}`;
@@ -97,12 +116,15 @@ const AISchedule = () => {
           endTime: endTimeStr,
           subject,
           duration: `${slotDuration} min`,
-          type: "Study",
+          type: goal === "deep-focus" ? "Deep Focus" : goal === "pomodoro" ? "Pomodoro" : "Mixed Study",
           priority: "medium",
-          reason: "Balanced study session"
+          reason: goal === "deep-focus" ? "Extended focused study session" : 
+                  goal === "pomodoro" ? "Short, intense study burst" : 
+                  "Alternating focus techniques"
         });
 
         currentTime = endTime + breakDuration;
+        durationIndex++;
       }
 
       setSchedule(slots);
@@ -111,12 +133,17 @@ const AISchedule = () => {
         strongAreas: validSubjects,
         bestStudyTime: studyPeriod,
         consistencyScore: 80,
-        tips: ["Take regular breaks", "Stay hydrated", "Review notes after each session"]
+        tips: goal === "deep-focus" 
+          ? ["Find a quiet environment", "Minimize distractions", "Take longer breaks between sessions", "Stay hydrated and comfortable"]
+          : goal === "pomodoro"
+          ? ["Set a timer for 25 minutes", "Take 5-minute breaks", "Use breaks for stretching or walking", "Complete one task per pomodoro"]
+          : ["Alternate between deep work and short bursts", "Use deep focus for complex topics", "Use pomodoro for review or practice", "Adjust based on your energy levels"]
       });
       toast({ title: "Schedule Generated! ✨", description: "Your study plan is ready" });
-    } catch (e: any) {
-      console.error(e);
-      toast({ title: "Generation Failed", description: e.message || "Something went wrong", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Something went wrong";
+      console.error(error);
+      toast({ title: "Generation Failed", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -216,9 +243,9 @@ const AISchedule = () => {
             <Select value={goal} onValueChange={setGoal}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="deep-focus">Deep Focus</SelectItem>
-                <SelectItem value="pomodoro">Pomodoro</SelectItem>
-                <SelectItem value="mixed">Mixed</SelectItem>
+                <SelectItem value="deep-focus">Deep Focus (2hr sessions)</SelectItem>
+                <SelectItem value="pomodoro">Pomodoro (25min sessions)</SelectItem>
+                <SelectItem value="mixed">Mixed (Deep Focus + Pomodoro)</SelectItem>
               </SelectContent>
             </Select>
           </div>

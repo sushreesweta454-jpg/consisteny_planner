@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Clock, CheckCircle2, Plus, Trash2, CalendarDays } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,22 +29,23 @@ const StudyPlan = () => {
   const [timeSlot, setTimeSlot] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     if (!user) return;
     sqliteClient.from("daily_tasks").select("*").eq("user_id", user.id).then(({ data, error }) => {
       if (error) {
         toast.error("Failed to load tasks");
       } else {
-        const filteredTasks = (data || []).filter(task => task.date === selectedDate);
+        const tasks = (Array.isArray(data) ? data : []) as DailyTask[];
+        const filteredTasks = tasks.filter(task => task.date === selectedDate);
         setTasks(filteredTasks);
       }
       setLoading(false);
     });
-  };
+  }, [user, selectedDate]);
 
   useEffect(() => {
     fetchTasks();
-  }, [user, selectedDate]);
+  }, [fetchTasks]);
 
   const addTask = async () => {
     if (!user || !subject.trim() || !topic.trim()) {

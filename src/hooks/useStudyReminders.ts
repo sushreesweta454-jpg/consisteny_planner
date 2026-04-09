@@ -23,7 +23,9 @@ function getReminderState(): ReminderState {
       const parsed: ReminderState = JSON.parse(raw);
       if (parsed.date === getTodayKey()) return parsed;
     }
-  } catch {}
+  } catch (error) {
+    console.warn("Failed to parse reminder state", error);
+  }
   return { date: getTodayKey(), goalSent: false, inactivitySent: false, planIncompleteSent: false };
 }
 

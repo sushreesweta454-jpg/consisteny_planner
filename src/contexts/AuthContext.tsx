@@ -1,12 +1,22 @@
 import React, { createContext, useEffect, useState, type ReactNode } from "react";
 import { auth, initDatabase } from "@/integrations/sqlite/client";
 
+type AuthUser = {
+  id: string;
+  email: string;
+  user_metadata?: {
+    full_name: string;
+  };
+};
+
+type AuthError = { message: string } | null;
+
 export interface AuthContextType {
   session: null;
-  user: any;
+  user: AuthUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError }>;
   signOut: () => Promise<void>;
 }
 
@@ -20,7 +30,7 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

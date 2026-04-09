@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie, { Table, type IndexableType } from 'dexie';
 
 // Define interfaces for our data
 export interface User {
@@ -49,8 +49,19 @@ export interface Reminder {
   created_at: string;
 }
 
+type SqliteCallback = (data: { data: unknown; error: { message: string } | null }) => void;
+
+type TableNames = 'users' | 'profiles' | 'study_sessions' | 'daily_tasks' | 'reminders';
+
+type TableRecord<T extends TableNames> =
+  T extends 'users' ? User :
+  T extends 'profiles' ? Profile :
+  T extends 'study_sessions' ? StudySession :
+  T extends 'daily_tasks' ? DailyTask :
+  Reminder;
+
 // Database class
-class ConsistifyDB extends Dexie {
+class ConsistencyDB extends Dexie {
   users!: Table<User>;
   profiles!: Table<Profile>;
   study_sessions!: Table<StudySession>;
@@ -58,7 +69,7 @@ class ConsistifyDB extends Dexie {
   reminders!: Table<Reminder>;
 
   constructor() {
-    super('consistify-db');
+    super('consistency-db');
     this.version(1).stores({
       users: 'id, email',
       profiles: 'id, user_id',
@@ -69,7 +80,7 @@ class ConsistifyDB extends Dexie {
   }
 }
 
-const db = new ConsistifyDB();
+const db = new ConsistencyDB();
 
 // Initialize database
 export const initDatabase = async () => {
@@ -116,8 +127,9 @@ export const auth = {
       });
 
       return { data: { user: { id: userId, email, user_metadata: { full_name: fullName } } }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { data: null, error: { message } };
     }
   },
 
@@ -133,8 +145,9 @@ export const auth = {
       } else {
         return { data: null, error: { message: 'Invalid email or password' } };
       }
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { data: null, error: { message } };
     }
   },
 
@@ -152,7 +165,7 @@ export const auth = {
     return { data: null, error: null };
   },
 
-  setUser: (user: any) => {
+  setUser: (user: Record<string, unknown>) => {
     localStorage.setItem('current-user', JSON.stringify(user));
   }
 };
@@ -161,28 +174,30 @@ export const auth = {
 export const sqliteClient = {
   from: (tableName: string) => ({
     select: (columns: string = '*') => ({
-      eq: (column: string, value: any) => ({
+      eq: (column: string, value: string | number | boolean) => ({
         single: async () => {
           await initDatabase();
           let result;
-          if (tableName === 'users') result = await db.users.where(column).equals(value).first();
-          else if (tableName === 'profiles') result = await db.profiles.where(column).equals(value).first();
-          else if (tableName === 'study_sessions') result = await db.study_sessions.where(column).equals(value).first();
-          else if (tableName === 'daily_tasks') result = await db.daily_tasks.where(column).equals(value).first();
-          else if (tableName === 'reminders') result = await db.reminders.where(column).equals(value).first();
+          const equalsValue = value as IndexableType;
+          if (tableName === 'users') result = await db.users.where(column).equals(equalsValue).first();
+          else if (tableName === 'profiles') result = await db.profiles.where(column).equals(equalsValue).first();
+          else if (tableName === 'study_sessions') result = await db.study_sessions.where(column).equals(equalsValue).first();
+          else if (tableName === 'daily_tasks') result = await db.daily_tasks.where(column).equals(equalsValue).first();
+          else if (tableName === 'reminders') result = await db.reminders.where(column).equals(equalsValue).first();
 
           return { data: result || null, error: null };
         },
         order: (orderColumn: string, options?: { ascending?: boolean }) => ({
           limit: (n: number) => ({
-            then: async (callback: (data: any) => void) => {
+            then: async (callback: SqliteCallback) => {
               await initDatabase();
               let query;
-              if (tableName === 'users') query = db.users.where(column).equals(value);
-              else if (tableName === 'profiles') query = db.profiles.where(column).equals(value);
-              else if (tableName === 'study_sessions') query = db.study_sessions.where(column).equals(value);
-              else if (tableName === 'daily_tasks') query = db.daily_tasks.where(column).equals(value);
-              else if (tableName === 'reminders') query = db.reminders.where(column).equals(value);
+              const equalsValue = value as IndexableType;
+              if (tableName === 'users') query = db.users.where(column).equals(equalsValue);
+              else if (tableName === 'profiles') query = db.profiles.where(column).equals(equalsValue);
+              else if (tableName === 'study_sessions') query = db.study_sessions.where(column).equals(equalsValue);
+              else if (tableName === 'daily_tasks') query = db.daily_tasks.where(column).equals(equalsValue);
+              else if (tableName === 'reminders') query = db.reminders.where(column).equals(equalsValue);
 
               if (query) {
                 const results = await query.sortBy(orderColumn);
@@ -194,14 +209,15 @@ export const sqliteClient = {
             }
           })
         }),
-        then: async (callback: (data: any) => void) => {
+        then: async (callback: SqliteCallback) => {
           await initDatabase();
           let query;
-          if (tableName === 'users') query = db.users.where(column).equals(value);
-          else if (tableName === 'profiles') query = db.profiles.where(column).equals(value);
-          else if (tableName === 'study_sessions') query = db.study_sessions.where(column).equals(value);
-          else if (tableName === 'daily_tasks') query = db.daily_tasks.where(column).equals(value);
-          else if (tableName === 'reminders') query = db.reminders.where(column).equals(value);
+          const equalsValue = value as IndexableType;
+          if (tableName === 'users') query = db.users.where(column).equals(equalsValue);
+          else if (tableName === 'profiles') query = db.profiles.where(column).equals(equalsValue);
+          else if (tableName === 'study_sessions') query = db.study_sessions.where(column).equals(equalsValue);
+          else if (tableName === 'daily_tasks') query = db.daily_tasks.where(column).equals(equalsValue);
+          else if (tableName === 'reminders') query = db.reminders.where(column).equals(equalsValue);
 
           if (query) {
             const results = await query.toArray();
@@ -212,7 +228,7 @@ export const sqliteClient = {
         }
       }),
       order: (orderColumn: string, options?: { ascending?: boolean }) => ({
-        then: async (callback: (data: any) => void) => {
+        then: async (callback: SqliteCallback) => {
           await initDatabase();
           let results = [];
           if (tableName === 'users') results = await db.users.orderBy(orderColumn).toArray();
@@ -225,7 +241,7 @@ export const sqliteClient = {
           callback({ data: results, error: null });
         }
       }),
-      then: async (callback: (data: any) => void) => {
+      then: async (callback: SqliteCallback) => {
         await initDatabase();
         let results = [];
         if (tableName === 'users') results = await db.users.toArray();
@@ -237,57 +253,62 @@ export const sqliteClient = {
         callback({ data: results, error: null });
       }
     }),
-    insert: (data: any) => ({
-      then: async (callback: (data: any) => void) => {
+    insert: (data: Record<string, unknown>) => ({
+      then: async (callback: SqliteCallback) => {
         await initDatabase();
         try {
           let id;
-          if (tableName === 'users') id = await db.users.add(data);
-          else if (tableName === 'profiles') id = await db.profiles.add(data);
-          else if (tableName === 'study_sessions') id = await db.study_sessions.add(data);
-          else if (tableName === 'daily_tasks') id = await db.daily_tasks.add(data);
-          else if (tableName === 'reminders') id = await db.reminders.add(data);
+          if (tableName === 'users') id = await db.users.add(data as unknown as User);
+          else if (tableName === 'profiles') id = await db.profiles.add(data as unknown as Profile);
+          else if (tableName === 'study_sessions') id = await db.study_sessions.add(data as unknown as StudySession);
+          else if (tableName === 'daily_tasks') id = await db.daily_tasks.add(data as unknown as DailyTask);
+          else if (tableName === 'reminders') id = await db.reminders.add(data as unknown as Reminder);
 
           callback({ data: { id }, error: null });
-        } catch (error: any) {
-          callback({ data: null, error: { message: error.message } });
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          callback({ data: null, error: { message } });
         }
       }
     }),
-    update: (updates: any) => ({
-      eq: (column: string, value: any) => ({
-        then: async (callback: (data: any) => void) => {
+    update: (updates: Record<string, unknown>) => ({
+      eq: (column: string, value: string | number | boolean) => ({
+        then: async (callback: SqliteCallback) => {
           await initDatabase();
           try {
             let count = 0;
-            if (tableName === 'users') count = await db.users.where(column).equals(value).modify(updates);
-            else if (tableName === 'profiles') count = await db.profiles.where(column).equals(value).modify(updates);
-            else if (tableName === 'study_sessions') count = await db.study_sessions.where(column).equals(value).modify(updates);
-            else if (tableName === 'daily_tasks') count = await db.daily_tasks.where(column).equals(value).modify(updates);
-            else if (tableName === 'reminders') count = await db.reminders.where(column).equals(value).modify(updates);
+            const equalsValue = value as IndexableType;
+            if (tableName === 'users') count = await db.users.where(column).equals(equalsValue).modify(updates);
+            else if (tableName === 'profiles') count = await db.profiles.where(column).equals(equalsValue).modify(updates);
+            else if (tableName === 'study_sessions') count = await db.study_sessions.where(column).equals(equalsValue).modify(updates);
+            else if (tableName === 'daily_tasks') count = await db.daily_tasks.where(column).equals(equalsValue).modify(updates);
+            else if (tableName === 'reminders') count = await db.reminders.where(column).equals(equalsValue).modify(updates);
 
             callback({ data: { count }, error: null });
-          } catch (error: any) {
-            callback({ data: null, error: { message: error.message } });
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            callback({ data: null, error: { message } });
           }
         }
       })
     }),
     delete: () => ({
-      eq: (column: string, value: any) => ({
-        then: async (callback: (data: any) => void) => {
+      eq: (column: string, value: string | number | boolean) => ({
+        then: async (callback: SqliteCallback) => {
           await initDatabase();
           try {
             let count = 0;
-            if (tableName === 'users') count = await db.users.where(column).equals(value).delete();
-            else if (tableName === 'profiles') count = await db.profiles.where(column).equals(value).delete();
-            else if (tableName === 'study_sessions') count = await db.study_sessions.where(column).equals(value).delete();
-            else if (tableName === 'daily_tasks') count = await db.daily_tasks.where(column).equals(value).delete();
-            else if (tableName === 'reminders') count = await db.reminders.where(column).equals(value).delete();
+            const equalsValue = value as IndexableType;
+            if (tableName === 'users') count = await db.users.where(column).equals(equalsValue).delete();
+            else if (tableName === 'profiles') count = await db.profiles.where(column).equals(equalsValue).delete();
+            else if (tableName === 'study_sessions') count = await db.study_sessions.where(column).equals(equalsValue).delete();
+            else if (tableName === 'daily_tasks') count = await db.daily_tasks.where(column).equals(equalsValue).delete();
+            else if (tableName === 'reminders') count = await db.reminders.where(column).equals(equalsValue).delete();
 
             callback({ data: { count }, error: null });
-          } catch (error: any) {
-            callback({ data: null, error: { message: error.message } });
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            callback({ data: null, error: { message } });
           }
         }
       })

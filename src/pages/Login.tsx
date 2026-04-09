@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, Eye, EyeOff } from "lucide-react";
@@ -27,7 +28,7 @@ const Login = () => {
   const { signIn, signUp } = useAuth();
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password || (!isLogin && !name)) {
       toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
@@ -46,8 +47,9 @@ const Login = () => {
         toast({ title: "Account created!", description: "Redirecting to dashboard..." });
       }
       navigate("/dashboard");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,7 @@ const Login = () => {
               <BookOpen className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold font-display mb-4 text-gradient-primary">Consistify</h1>
+          <h1 className="text-5xl font-bold font-display mb-4 text-gradient-primary">Consistency</h1>
           <p className="text-muted-foreground text-lg mb-8">AI-Powered Study Consistency Planner</p>
           <div className="glass-card p-6 glow-primary">
             <p className="text-foreground/80 italic text-sm">"{randomQuote}"</p>
@@ -89,7 +91,7 @@ const Login = () => {
         >
           <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
             <BookOpen className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold font-display text-gradient-primary">Consistify</span>
+            <span className="text-2xl font-bold font-display text-gradient-primary">Consistency</span>
           </div>
 
           <h2 className="text-3xl font-bold font-display mb-2">{isLogin ? "Welcome back" : "Create account"}</h2>
