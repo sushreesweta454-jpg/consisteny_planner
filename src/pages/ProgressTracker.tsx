@@ -118,7 +118,7 @@ const ProgressTracker = () => {
         <h1 className="text-3xl font-bold font-display flex items-center gap-3">
           <TrendingUp className="h-8 w-8 text-primary" /> Progress Dashboard
         </h1>
-        <p className="text-muted-foreground mt-1">Track consistency, performance & subject distribution</p>
+        <p className="text-muted-foreground mt-1">Track consistency and performance</p>
       </motion.div>
 
       {/* Tabs */}
