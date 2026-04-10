@@ -34,25 +34,53 @@ const priorityColors: Record<string, string> = {
   low: "bg-success/10 text-success border-success/20",
 };
 
-const timeSlotOptions = [
-  { value: "morning", label: "🌅 Morning", range: "5:00 AM – 12:00 PM", start: "05:00" },
-  { value: "afternoon", label: "☀️ Afternoon", range: "12:00 PM – 5:00 PM", start: "12:00" },
-  { value: "evening", label: "🌙 Evening", range: "5:00 PM – 11:00 PM", start: "17:00" },
-];
+const defaultTimeSlot = { start: "17:00", end: "19:00" };
 
 const AISchedule = () => {
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [weakSubjects, setWeakSubjects] = useState<boolean[]>([false]);
-  const [availableHours, setAvailableHours] = useState("4");
+  const [studyTimeSlots, setStudyTimeSlots] = useState([{ ...defaultTimeSlot }]);
   const [goal, setGoal] = useState("deep-focus");
-  const [studyPeriod, setStudyPeriod] = useState("morning");
   const [schedule, setSchedule] = useState<GeneratedSlot[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
+  const [motivation, setMotivation] = useState("Keep the momentum going — one focused step at a time.");
   const [loading, setLoading] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  const addTimeSlot = () => {
+    setStudyTimeSlots([...studyTimeSlots, { ...defaultTimeSlot }]);
+  };
+
+  const removeTimeSlot = (index: number) => {
+    setStudyTimeSlots(studyTimeSlots.filter((_, idx) => idx !== index));
+  };
+
+  const updateTimeSlot = (index: number, key: "start" | "end", value: string) => {
+    const updated = [...studyTimeSlots];
+    updated[index] = { ...updated[index], [key]: value };
+    setStudyTimeSlots(updated);
+  };
+
+  const parseTime = (value: string) => {
+    const [hour, minute] = value.split(":").map(Number);
+    return hour * 60 + minute;
+  };
+
+  const formatDisplayTime = (minutes: number) => {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${hour12}:${minute.toString().padStart(2, "0")} ${suffix}`;
+  };
+
+  const getNextSubject = (subjects: string[], lastSubject: string) => {
+    const candidates = subjects.filter((subject) => subject !== lastSubject);
+    return candidates.length > 0 ? candidates[0] : subjects[0];
+  };
   
   const addSubject = () => {
     setSubjects([...subjects, ""]);
@@ -74,7 +102,7 @@ const AISchedule = () => {
   };
 
   const generateSchedule = async () => {
-    const validSubjects = subjects.filter((s) => s.trim());
+    const validSubjects = subjects.map((s) => s.trim()).filter(Boolean);
     if (validSubjects.length === 0) {
       toast({ title: "Error", description: "Add at least one subject", variant: "destructive" });
       return;
@@ -84,88 +112,166 @@ const AISchedule = () => {
       return;
     }
 
+    const subjectData = subjects
+      .map((subject, index) => ({ subject: subject.trim(), isWeak: weakSubjects[index] ?? false }))
+      .filter((item) => item.subject);
+
+    const activeSlots = studyTimeSlots
+      .map((slot) => ({
+        start: parseTime(slot.start),
+        end: parseTime(slot.end),
+      }))
+      .filter((slot) => slot.start < slot.end && slot.end - slot.start >= 30)
+      .sort((a, b) => a.start - b.start);
+
+    if (activeSlots.length === 0) {
+      toast({ title: "Error", description: "Provide a valid study time slot of at least 30 minutes.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     setSchedule([]);
     setInsights(null);
 
     try {
-      // Simple local schedule generation
-      const selectedPeriod = timeSlotOptions.find(t => t.value === studyPeriod);
-      const startTime = selectedPeriod?.start || "06:00";
-      const [startHour, startMin] = startTime.split(':').map(Number);
-      const totalMinutes = parseInt(availableHours) * 60;
-      const endOfPeriod = startHour * 60 + startMin + totalMinutes;
-      const slots: GeneratedSlot[] = [];
-      let currentTime = startHour * 60 + startMin;
-
-      const subjectData = subjects
-        .map((subject, index) => ({ subject: subject.trim(), isWeak: weakSubjects[index] ?? false }))
-        .filter((item) => item.subject);
-
       const weakAreas = subjectData.filter((item) => item.isWeak).map((item) => item.subject);
       const strongAreas = subjectData.filter((item) => !item.isWeak).map((item) => item.subject);
+      const scheduleSlots: GeneratedSlot[] = [];
 
-      // Define study durations based on goal
-      let studyDurations: number[] = [];
-      let breakDuration = 10; // default break
+      let lastSubject = "";
+      let pomodoroCount = 0;
+      const studySubjects = subjectData.map((item) => item.subject);
 
-      if (goal === "deep-focus") {
-        studyDurations = [120]; // 2 hours
-        breakDuration = 15;
-      } else if (goal === "pomodoro") {
-        studyDurations = [25]; // 25 minutes
-        breakDuration = 5;
-      } else if (goal === "mixed") {
-        studyDurations = [120, 25];
-        breakDuration = 10;
+      const getStyleForTime = (minuteOfDay: number) => {
+        if (goal === "pomodoro") return "pomodoro";
+        if (goal === "deep-focus") return "deep-focus";
+        return minuteOfDay < 12 * 60 ? "deep-focus" : "pomodoro";
+      };
+
+      const getNextStudySubject = () => {
+        const next = getNextSubject(studySubjects, lastSubject);
+        lastSubject = next;
+        return next;
+      };
+
+      for (const slot of activeSlots) {
+        let current = slot.start;
+        while (current + 30 <= slot.end) {
+          const style = getStyleForTime(current);
+
+          if (style === "pomodoro") {
+            const studyDuration = 25;
+            if (current + studyDuration > slot.end) break;
+
+            const subject = getNextStudySubject();
+            const studyEnd = current + studyDuration;
+            scheduleSlots.push({
+              time: formatDisplayTime(current),
+              endTime: formatDisplayTime(studyEnd),
+              subject,
+              duration: `${studyDuration} min`,
+              type: "Pomodoro",
+              priority: subjectData.find((item) => item.subject === subject)?.isWeak ? "high" : "medium",
+              reason: subjectData.find((item) => item.subject === subject)?.isWeak
+                ? "Weak subject detected, giving it priority study time."
+                : "Short, focused 25-minute burst."
+            });
+            current = studyEnd;
+            pomodoroCount += 1;
+
+            const breakDuration = pomodoroCount % 4 === 0 ? 15 : 5;
+            if (current + breakDuration > slot.end) break;
+            scheduleSlots.push({
+              time: formatDisplayTime(current),
+              endTime: formatDisplayTime(current + breakDuration),
+              subject: "Break",
+              duration: `${breakDuration} min`,
+              type: "Break",
+              priority: "low",
+              reason: "Use this time to stretch and reset."
+            });
+            current += breakDuration;
+          } else {
+            const remaining = slot.end - current;
+            const sessionDuration = remaining >= 90 ? 90 : remaining >= 60 ? 60 : remaining;
+            if (sessionDuration < 45) break;
+
+            const subject = getNextStudySubject();
+            const studyEnd = current + sessionDuration;
+            scheduleSlots.push({
+              time: formatDisplayTime(current),
+              endTime: formatDisplayTime(studyEnd),
+              subject,
+              duration: `${sessionDuration} min`,
+              type: "Deep Focus",
+              priority: subjectData.find((item) => item.subject === subject)?.isWeak ? "high" : "medium",
+              reason: subjectData.find((item) => item.subject === subject)?.isWeak
+                ? "Weak subject detected, giving it priority study time."
+                : "Long focus session for deeper understanding."
+            });
+            current = studyEnd;
+
+            const breakDuration = Math.min(10, slot.end - current);
+            if (breakDuration < 5) break;
+            scheduleSlots.push({
+              time: formatDisplayTime(current),
+              endTime: formatDisplayTime(current + breakDuration),
+              subject: "Break",
+              duration: `${breakDuration} min`,
+              type: "Break",
+              priority: "low",
+              reason: "Step away for a moment and refresh your focus."
+            });
+            current += breakDuration;
+          }
+        }
       }
 
-      let durationIndex = 0;
-
-      for (let i = 0; i < subjectData.length && currentTime < endOfPeriod; i++) {
-        const { subject, isWeak } = subjectData[i];
-        const baseDuration = studyDurations[durationIndex % studyDurations.length];
-        const extraDuration = isWeak ? Math.round(baseDuration * 0.5) : 0;
-        const slotDuration = baseDuration + extraDuration;
-        const endTime = currentTime + slotDuration;
-
-        if (endTime > endOfPeriod) break;
-
-        const timeStr = `${Math.floor(currentTime / 60).toString().padStart(2, '0')}:${(currentTime % 60).toString().padStart(2, '0')}`;
-        const endTimeStr = `${Math.floor(endTime / 60).toString().padStart(2, '0')}:${(endTime % 60).toString().padStart(2, '0')}`;
-
-        slots.push({
-          time: timeStr,
-          endTime: endTimeStr,
-          subject,
-          duration: `${slotDuration} min`,
-          type: goal === "deep-focus" ? "Deep Focus" : goal === "pomodoro" ? "Pomodoro" : "Mixed Study",
-          priority: isWeak ? "high" : "medium",
-          reason: isWeak
-            ? "Weak subject detected, giving it extra study time."
-            : goal === "deep-focus"
-            ? "Extended focused study session"
-            : goal === "pomodoro"
-            ? "Short, intense study burst"
-            : "Alternating focus techniques"
-        });
-
-        currentTime = endTime + breakDuration;
-        durationIndex++;
+      while (scheduleSlots.length && scheduleSlots[scheduleSlots.length - 1].subject === "Break") {
+        scheduleSlots.pop();
       }
 
-      setSchedule(slots);
+      const studyIndices = scheduleSlots
+        .map((slot, index) => (!slot.subject.toLowerCase().includes("break") ? index : -1))
+        .filter((index) => index !== -1);
+
+      if (studyIndices.length > 0) {
+        const practiceIndex = studyIndices[Math.min(1, studyIndices.length - 1)];
+        scheduleSlots[practiceIndex].subject = `${scheduleSlots[practiceIndex].subject} - PYQ Practice`;
+        scheduleSlots[practiceIndex].priority = "high";
+
+        if (studyIndices.length > 1) {
+          const revisionIndex = studyIndices[studyIndices.length - 1];
+          if (revisionIndex !== practiceIndex) {
+            scheduleSlots[revisionIndex].subject = `${scheduleSlots[revisionIndex].subject} - Revision`;
+            scheduleSlots[revisionIndex].priority = "medium";
+          }
+        }
+      }
+
+      const bestStudyTime = activeSlots.length === 1
+        ? `${formatDisplayTime(activeSlots[0].start)} – ${formatDisplayTime(activeSlots[0].end)}`
+        : `${formatDisplayTime(activeSlots[0].start)} – ${formatDisplayTime(activeSlots[activeSlots.length - 1].end)}`;
+
+      setSchedule(scheduleSlots);
+      setMotivation(
+        goal === "pomodoro"
+          ? "Small, consistent bursts build unstoppable study momentum."
+          : goal === "deep-focus"
+          ? "Deep focus now gives you the confidence to finish strong."
+          : "Smart mornings and energetic evenings create a balanced study day."
+      );
       setInsights({
         weakAreas,
         strongAreas,
-        bestStudyTime: studyPeriod,
-        consistencyScore: 80,
+        bestStudyTime,
+        consistencyScore: Math.min(95, Math.max(70, studyIndices.length * 12)),
         tips:
           goal === "deep-focus"
-            ? ["Find a quiet environment", "Minimize distractions", "Take longer breaks between sessions", "Stay hydrated and comfortable"]
+            ? ["Choose one clear goal for each session", "Remove distractions", "Stand up during breaks", "Stay hydrated and comfortable"]
             : goal === "pomodoro"
-            ? ["Set a timer for 25 minutes", "Take 5-minute breaks", "Use breaks for stretching or walking", "Complete one task per pomodoro"]
-            : ["Alternate between deep work and short bursts", "Use deep focus for complex topics", "Use pomodoro for review or practice", "Adjust based on your energy levels"]
+            ? ["Set a timer for 25 minutes", "Take 5-minute breaks", "Use breaks for stretching or walking", "Keep focus on one topic per burst"]
+            : ["Use morning blocks for deep focus", "Use evening Pomodoro for review and practice", "Rotate subjects evenly", "Keep breaks short but refreshing"]
       });
       toast({ title: "Schedule Generated! ✨", description: "Your study plan is ready" });
     } catch (error: unknown) {
@@ -246,38 +352,54 @@ const AISchedule = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-foreground/80">Available Hours</Label>
-            <Select value={availableHours} onValueChange={setAvailableHours}>
-              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5, 6, 7, 8].map((h) => (
-                  <SelectItem key={h} value={String(h)}>{h} hours</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-foreground/80">Study Period</Label>
-            <Select value={studyPeriod} onValueChange={setStudyPeriod}>
-              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {timeSlotOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">{timeSlotOptions.find(t => t.value === studyPeriod)?.range}</p>
+            <Label className="text-foreground/80">Study Time Slots</Label>
+            <div className="space-y-3">
+              {studyTimeSlots.map((slot, i) => (
+                <div key={i} className="grid grid-cols-2 gap-3 items-end">
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80">Start</Label>
+                    <Input
+                      type="time"
+                      value={slot.start}
+                      onChange={(e) => updateTimeSlot(i, "start", e.target.value)}
+                      className="bg-secondary border-border h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80">End</Label>
+                    <Input
+                      type="time"
+                      value={slot.end}
+                      onChange={(e) => updateTimeSlot(i, "end", e.target.value)}
+                      className="bg-secondary border-border h-10"
+                    />
+                  </div>
+                  {studyTimeSlots.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive self-center col-span-2 justify-self-end"
+                      onClick={() => removeTimeSlot(i)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addTimeSlot} className="border-dashed border-border text-muted-foreground">
+                <Plus className="h-4 w-4 mr-1" /> Add Study Time Slot
+              </Button>
+              <p className="text-xs text-muted-foreground">Enter one or more study time slots. Sessions will be scheduled inside these slots.</p>
+            </div>
           </div>
           <div className="space-y-2">
             <Label className="text-foreground/80">Study Style</Label>
             <Select value={goal} onValueChange={setGoal}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="deep-focus">Deep Focus (2hr sessions)</SelectItem>
+                <SelectItem value="deep-focus">Deep Focus (60–90min sessions)</SelectItem>
                 <SelectItem value="pomodoro">Pomodoro (25min sessions)</SelectItem>
                 <SelectItem value="mixed">Mixed (Deep Focus + Pomodoro)</SelectItem>
               </SelectContent>
@@ -370,6 +492,9 @@ const AISchedule = () => {
                 <Save className="h-4 w-4 mr-1" /> {saving ? "Saving..." : "Save to Planner"}
               </Button>
             </div>
+            {motivation && (
+              <p className="text-sm text-muted-foreground mb-4">{motivation}</p>
+            )}
             <div className="space-y-2">
               {schedule.map((slot, i) => {
                 const isBreak = slot.subject.toLowerCase().includes("break");
