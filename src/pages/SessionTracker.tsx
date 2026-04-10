@@ -84,28 +84,63 @@ const SessionTracker = () => {
   const formatClockTime = (ts: number) =>
     new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+  const markMatchingStudyPlanTasksCompleted = useCallback(async (subject: string) => {
+    if (!user || !subject.trim()) return;
+
+    const normalizedSubject = subject.trim().toLowerCase();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await new Promise<void>((resolve) => {
+      sqliteClient.from("daily_tasks").select("*").eq("user_id", user.id).then(({ data }) => {
+        const tasks = Array.isArray(data) ? data : [];
+        const matches = tasks.filter((task) =>
+          task.date === today &&
+          task.subject.trim().toLowerCase() === normalizedSubject &&
+          !task.completed
+        );
+
+        if (!matches.length) {
+          resolve();
+          return;
+        }
+
+        Promise.all(matches.map((task) => new Promise<void>((innerResolve) => {
+          sqliteClient.from("daily_tasks").update({ completed: true }).eq("id", task.id).then(() => innerResolve());
+        }))).then(() => {
+          window.dispatchEvent(new CustomEvent("study-plan-tasks-updated", {
+            detail: { date: today, subject: normalizedSubject }
+          }));
+          toast({ title: "Study plan synced", description: `Marked ${subject.trim()} complete for today.` });
+          resolve();
+        });
+      });
+    });
+  }, [toast, user]);
+
   const startSession = useCallback(() => {
     if (activeSession) return;
     const session: ActiveSession = { startTime: Date.now(), mode };
     setActiveSession(session);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     toast({ title: "Session started!", description: `${mode === "pomodoro" ? "Pomodoro" : "Deep Focus"} mode` });
-  }, [activeSession, mode, toast]);
+  }, [activeSession, mode, toast, user]);
 
   const finishSession = useCallback(async () => {
     if (!activeSession || !user) return;
     const endTime = Date.now();
     const duration = Math.floor((endTime - activeSession.startTime) / 1000);
     const modeLabel = activeSession.mode === "pomodoro" ? "Pomodoro" : "Deep Focus";
-    const taskLabel = subjectName.trim() ? `${subjectName.trim()} (${modeLabel})` : modeLabel;
+    const taskLabel = subjectName.trim() || modeLabel;
     sqliteClient.from("study_sessions").insert({
       id: Date.now().toString(),
       user_id: user.id,
       task: taskLabel,
       duration,
       created_at: new Date().toISOString()
-    }).then(({ error }) => {
+    }).then(async ({ error }) => {
       if (!error) {
+        await markMatchingStudyPlanTasksCompleted(subjectName.trim());
+
         // Refresh today's sessions
         const today = new Date().toISOString().slice(0, 10);
         sqliteClient.from("study_sessions").select("*").eq("user_id", user.id).then(({ data }) => {

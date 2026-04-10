@@ -47,6 +47,15 @@ const StudyPlan = () => {
     fetchTasks();
   }, [fetchTasks]);
 
+  useEffect(() => {
+    const handleStudyPlanSync = () => {
+      fetchTasks();
+    };
+
+    window.addEventListener("study-plan-tasks-updated", handleStudyPlanSync);
+    return () => window.removeEventListener("study-plan-tasks-updated", handleStudyPlanSync);
+  }, [fetchTasks]);
+
   const addTask = async () => {
     if (!user || !subject.trim() || !topic.trim()) {
       toast.error("Subject and topic are required");
